@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canlı TV</title>
+    <script src="https://vjs.zencdn.net/8.6.1/video.min.js"></script>
+    <link href="https://vjs.zencdn.net/8.6.1/video-js.css" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #1a1a1a;
+            color: white;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .channels {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .channel-btn {
+            padding: 10px 20px;
+            background: #333;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .channel-btn:hover {
+            background: #555;
+        }
+        .channel-btn.active {
+            background: #007bff;
+        }
+        .video-container {
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .video-js {
+            width: 100%;
+            height: 450px;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Canlı TV Yayını</h1>
+        
+        <div class="channels" id="channelList">
+            <div class="loading">Kanallar yükleniyor...</div>
+        </div>
+        
+        <div class="video-container">
+            <video-js
+                id="video-player"
+                class="video-js vjs-default-skin"
+                controls
+                preload="auto"
+                data-setup="{}">
+                <p class="vjs-no-js">
+                    Video oynatmak için 
+                    <a href="https://videojs.com/html5-video-support/" target="_blank">
+                        HTML5 destekli bir tarayıcı
+                    </a> gereklidir.
+                </p>
+            </video-js>
+        </div>
+    </div>
+
+    <script>
+        let player;
+        let currentChannel = null;
+
+        // Video.js oynatıcıyı başlat
+        document.addEventListener('DOMContentLoaded', function() {
+            player = videojs('video-player', {
+                fluid: true,
+                responsive: true,
+                html5: {
+                    hls: {
+                        enableLowInitialPlaylist: true,
+                        smoothQualityChange: true,
+                        overrideNative: true
+                    }
+                }
+            });
+
+            loadChannels();
+        });
+
+        // Kanalları yükle
+        async function loadChannels() {
+            try {
+                const response = await fetch('http://localhost:5001/api/channels');
+                const channels = await response.json();
+                
+                const channelList = document.getElementById('channelList');
+                channelList.innerHTML = '';
+                
+                channels.forEach(channel => {
+                    const button = document.createElement('button');
+                    button.className = 'channel-btn';
+                    button.textContent = channel;
+                    button.onclick = () => selectChannel(channel, button);
+                    channelList.appendChild(button);
+                });
+                
+            } catch (error) {
+                console.error('Kanallar yüklenirken hata:', error);
+                document.getElementById('channelList').innerHTML = 
+                    '<div style="color: red;">Kanallar yüklenemedi</div>';
+            }
+        }
+
+        // Kanal seç
+        function selectChannel(channelName, buttonElement) {
+            // Önceki aktif butonu temizle
+            document.querySelectorAll('.channel-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Yeni butonu aktif yap
+            buttonElement.classList.add('active');
+            
+            // Kanalı oynat
+            playChannel(channelName);
+        }
+
+        // Kanalı oynat
+        function playChannel(channelName) {
+            if (currentChannel === channelName) return;
+            
+            currentChannel = channelName;
+            const streamUrl = `http://localhost:5001/api/stream/${encodeURIComponent(channelName)}`;
+            
+            console.log(`${channelName} kanalı oynatılıyor...`);
+            
+            player.src({
+                src: streamUrl,
+                type: 'application/x-mpegURL'
+            });
+            
+            player.ready(() => {
+                player.play().catch(error => {
+                    console.error('Oynatma hatası:', error);
+                });
+            });
+        }
+    </script>
+</body>
+</html>

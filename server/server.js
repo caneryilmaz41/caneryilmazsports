@@ -11,7 +11,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: ['https://caneryilmazsports.vercel.app', 'http://localhost:3000'],
+  credentials: true
+}));
 
 // --- helper.js otomatik çalıştırma (periyodik) ---
 let helperRunning = false;

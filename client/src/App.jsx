@@ -85,11 +85,7 @@ export default function App() {
     setIsPlaying(false);
 
     if (Hls.isSupported()) {
-      const hls = new Hls({
-        xhrSetup: (xhr, url) => {
-          xhr.open("GET", `${getServerUrl()}/api/proxy?url=${encodeURIComponent(url)}`);
-        },
-      });
+      const hls = new Hls();
       hls.loadSource(streamUrl);
       hls.attachMedia(video);
       hls.on(Hls.Events.MANIFEST_PARSED, async () => {

@@ -12,7 +12,7 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(cors({
-  origin: ['https://caneryilmazsports.vercel.app', 'http://localhost:3000'],
+  origin: ['https://caneryilmazsports.vercel.app', 'http://localhost:5173'],
   credentials: true
 }));
 

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import Hls from "hls.js";
 
 const getServerUrl = () => {
-  const url = process.env.REACT_APP_SERVER_URL || "https://caneryilmazsports-server.onrender.com";
+  const url = process.env.REACT_APP_SERVER_URL || "https://caneryilmazsports.onrender.com";
   console.log('Server URL:', url);
   return url;
 };

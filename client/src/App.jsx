@@ -1,6 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Hls from "hls.js";
-export const BASE_URL = process.env.REACT_APP_SERVER_URL || "http://localhost:5001"
+
+const getServerUrl = () => {
+  const url = process.env.REACT_APP_SERVER_URL || "http://localhost:5001";
+  console.log('Server URL:', url);
+  return url;
+};
 
 /* Hafif, bağımsız ikonlar (kütüphane yok, inline SVG) */
 const IconBall = (props) => (
@@ -51,14 +56,14 @@ export default function App() {
   
 
   useEffect(() => {
-    fetch(BASE_URL+"/api/channels")
+    fetch(getServerUrl()+"/api/channels")
       .then((res) => res.json())
       .then((data) => setChannels(Array.isArray(data) ? data : Object.keys(data || {})))
       .catch(() => setChannels(["BeIN Sports 1", "BeIN Sports 2", "BeIN Sports 3", "BeIN Sports 4"]));
   }, []);
 
   useEffect(() => {
-    fetch(BASE_URL+"/api/matches")
+    fetch(getServerUrl()+"/api/matches")
       .then((r) => r.json())
       .then((d) => setMatches(Array.isArray(d) ? d : []))
       .catch(() => setMatches([]));
@@ -82,7 +87,7 @@ export default function App() {
     if (Hls.isSupported()) {
       const hls = new Hls({
         xhrSetup: (xhr, url) => {
-          xhr.open("GET", `${BASE_URL}/api/proxy?url=${encodeURIComponent(url)}`);
+          xhr.open("GET", `${getServerUrl()}/api/proxy?url=${encodeURIComponent(url)}`);
         },
       });
       hls.loadSource(streamUrl);
@@ -122,12 +127,12 @@ export default function App() {
   };
 
   const playChannel = (channelName) => {
-    const streamUrl = `${BASE_URL}/api/stream/${encodeURIComponent(channelName)}`;
+    const streamUrl = `${getServerUrl()}/api/stream/${encodeURIComponent(channelName)}`;
     commonPlay(streamUrl, channelName);
   };
 
   const playByMatchId = (id, fallbackTitle = null) => {
-    const streamUrl = `${BASE_URL}/api/stream-id/${encodeURIComponent(id)}`;
+    const streamUrl = `${getServerUrl()}/api/stream-id/${encodeURIComponent(id)}`;
     commonPlay(streamUrl, fallbackTitle || id);
   };
 

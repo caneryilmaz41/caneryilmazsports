@@ -1,0 +1,10 @@
+{
+  "env": {
+    "REACT_APP_SERVER_URL": "https://caneryilmazsports-server.onrender.com"
+  },
+  "build": {
+    "env": {
+      "REACT_APP_SERVER_URL": "https://caneryilmazsports-server.onrender.com"
+    }
+  }
+}

@@ -13,7 +13,7 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
-// Render / proxy arkasında doğru proto/host için
+// Render proxy arkasında doğru proto/host
 app.set("trust proxy", 1);
 
 // ---------- CORS ----------
@@ -53,7 +53,6 @@ function getReferer() {
   try {
     if (fs.existsSync(FILE_DOMAIN)) {
       const j = JSON.parse(fs.readFileSync(FILE_DOMAIN, "utf-8"));
-      // helper.js domain.json { domain: "https://trgoalsXXXX.xyz" } yazıyor
       if (j?.activeDomain) return j.activeDomain;
       if (j?.domain) return j.domain;
     }
@@ -66,11 +65,8 @@ function loadStreams() {
   try {
     if (!fs.existsSync(FILE_STREAMS)) return null;
     const data = JSON.parse(fs.readFileSync(FILE_STREAMS, "utf-8"));
-
-    // yeni şema varsa direkt dön
-    if (data && (data.AUTO || data.byId || data.channels)) return data;
-
-    // düz map şeması: { "BeIN Sports 1": "https://...m3u8", ... }
+    if (data && (data.AUTO || data.byId || data.channels)) return data; // yeni şema
+    // düz map → yeni şemaya çevir
     const channels = {};
     for (const [k, v] of Object.entries(data || {})) {
       if (typeof v === "string" && v.includes(".m3u8")) channels[k] = v;
@@ -266,13 +262,12 @@ app.get("/api/stream/:key", async (req, res) => {
   }
 });
 
-// ---------- Stream by ID (örn. yayin1) ----------
+// ---------- Stream by ID ----------
 app.get("/api/stream-id/:id", async (req, res) => {
   try {
     const id = decodeURIComponent(req.params.id || "");
     const streams = loadStreams();
 
-    // 1) byId doğrudan URL ise
     if (streams?.byId?.[id]) {
       const url = streams.byId[id];
       const u = new URL(url);
@@ -302,7 +297,6 @@ app.get("/api/stream-id/:id", async (req, res) => {
       return res.send(rewritten);
     }
 
-    // 2) id -> kanal adı
     const name = channelNameFromId(id);
     if (!name) return res.status(404).send("Unknown id");
 

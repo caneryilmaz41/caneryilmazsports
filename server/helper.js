@@ -6,9 +6,9 @@ import fetch from "node-fetch";
 import path from "path";
 import https from "https";
 
-const LISTEN_MS = 120000;        // m3u8 dinleme süresi (2 dk)
-const NAV_TIMEOUT = 30000;       // sayfa timeout (30 sn)
-const YAYIN_RE = /\/(yayin[a-z0-9]+)\.m3u8(\?|$)/i; // harf + rakam destekli
+const LISTEN_MS = 120000;
+const NAV_TIMEOUT = 30000;
+const YAYIN_RE = /\/(yayin[a-z0-9]+)\.m3u8(\?|$)/i;
 const ANY_M3U8 = /\.m3u8(\?|$)/i;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -34,10 +34,7 @@ async function quickProbe(url) {
   try {
     const res = await fetch(url, {
       method: "HEAD", timeout: 3000, agent,
-      headers: {
-        "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36",
-        Accept: "*/*",
-      },
+      headers: { "User-Agent":"Mozilla/5.0", Accept: "*/*" },
     });
     if (res.ok) return true;
   } catch {}
@@ -45,7 +42,7 @@ async function quickProbe(url) {
     const res = await fetch(url, {
       method: "GET", timeout: 4000, agent, redirect: "manual",
       headers: {
-        "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36",
+        "User-Agent":"Mozilla/5.0",
         Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "tr-TR,tr;q=0.9",
       },
@@ -54,7 +51,7 @@ async function quickProbe(url) {
   } catch { return false; }
 }
 
-async function findActiveDomain(start = 1380, end = 1410) {
+async function findActiveDomain(start = 1380, end = 1415) {
   const base = "https://trgoals";
   const tld = ".xyz";
   for (let i = end; i >= start; i--) {
@@ -75,12 +72,11 @@ async function findActiveDomain(start = 1380, end = 1410) {
   throw new Error("❌ Aktif domain bulunamadı");
 }
 
-/* ---------- MAÇ LİSTESİ: önce HTTP, boşsa Puppeteer ---------- */
 async function fetchMatchesViaHTTP(activeDomain) {
   try {
     const res = await fetch(activeDomain, {
       headers: {
-        "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36",
+        "User-Agent":"Mozilla/5.0",
         "Accept-Language": "tr-TR,tr;q=0.9",
         Accept: "text/html,*/*",
       },
@@ -123,31 +119,22 @@ async function fetchMatchesViaHTTP(activeDomain) {
 }
 
 async function scrapeMatchesViaPuppeteer(browser, activeDomain) {
-  const matchPage = await browser.newPage();
+  const page = await browser.newPage();
   try {
-    await matchPage.goto(activeDomain, { waitUntil: "domcontentloaded", timeout: 30000 });
-    await matchPage.waitForSelector("#matches-tab a.channel-item", { timeout: 10000 }).catch(() => {});
-    let rows = [];
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        rows = await matchPage.$$eval("#matches-tab a.channel-item", (as) =>
-          as.map((a) => {
-            const name = a.querySelector(".channel-name")?.textContent?.trim() || "";
-            const time = a.querySelector(".channel-status")?.textContent?.trim() || "";
-            const href = a.getAttribute("href") || "";
-            const id = (() => {
-              try { const u = new URL(href, location.origin); return u.searchParams.get("id"); }
-              catch { const m = href.match(/id=([^&]+)/); return m ? m[1] : null; }
-            })();
-            return { title: name, time: time || null, id: id || null, href: href || null };
-          })
-        );
-        break;
-      } catch (e) {
-        console.log(`$$eval deneme ${attempt + 1} başarısız:`, e.message);
-        if (attempt < 2) await sleep(2000);
-      }
-    }
+    await page.goto(activeDomain, { waitUntil: "domcontentloaded", timeout: 30000 });
+    await page.waitForSelector("#matches-tab a.channel-item", { timeout: 10000 }).catch(() => {});
+    const rows = await page.$$eval("#matches-tab a.channel-item", (as) =>
+      as.map((a) => {
+        const name = a.querySelector(".channel-name")?.textContent?.trim() || "";
+        const time = a.querySelector(".channel-status")?.textContent?.trim() || "";
+        const href = a.getAttribute("href") || "";
+        const id = (() => {
+          try { const u = new URL(href, location.origin); return u.searchParams.get("id"); }
+          catch { const m = href.match(/id=([^&]+)/); return m ? m[1] : null; }
+        })();
+        return { title: name, time: time || null, id: id || null, href: href || null };
+      })
+    );
     const seen = new Set();
     const filtered = rows.filter((r) => {
       if (!r.title) return false;
@@ -159,7 +146,7 @@ async function scrapeMatchesViaPuppeteer(browser, activeDomain) {
     console.log("Puppeteer match scrape hata:", e.message);
     return null;
   } finally {
-    await matchPage.close();
+    await page.close();
   }
 }
 
@@ -174,7 +161,6 @@ async function collectMatches(activeDomain, browser) {
   console.log(`✅ matches.json yazıldı — ${out.length} kayıt`);
 }
 
-/* ---------- m3u8 yakala ve streams.json üret ---------- */
 (async () => {
   const chromePath = guessChrome();
   console.log("Chrome path:", chromePath);
@@ -183,7 +169,7 @@ async function collectMatches(activeDomain, browser) {
     process.exit(2);
   }
 
-  const activeDomain = await findActiveDomain(1380, 1410);
+  const activeDomain = await findActiveDomain(1380, 1415);
   const TARGET = `${activeDomain}/channel.html?id=yayin1`;
 
   const browser = await puppeteer.launch({
@@ -258,7 +244,6 @@ async function collectMatches(activeDomain, browser) {
     }
   };
 
-  // sadece m3u8’leri dinle
   cdp.on("Network.requestWillBeSent", (e) => { const u = e?.request?.url; if (u?.includes(".m3u8")) consider(u); });
   cdp.on("Network.responseReceived", (e) => { const u = e?.response?.url; if (u?.includes(".m3u8")) consider(u); });
   page.on("request", (req) => { const u = req.url(); if (u?.includes(".m3u8")) consider(u); });

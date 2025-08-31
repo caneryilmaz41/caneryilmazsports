@@ -1,369 +1,354 @@
-// server.js
-import express from "express";
-import cors from "cors";
-import fetch from "node-fetch";
+/* eslint-disable no-console */
+import puppeteer from "puppeteer-core";
+import os from "os";
 import fs from "fs";
+import fetch from "node-fetch";
 import path from "path";
 import https from "https";
-import { fileURLToPath } from "url";
-import { spawn } from "child_process";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const LISTEN_MS = 120000;        // m3u8 dinleme süresi (2 dakika)
+const NAV_TIMEOUT = 30000;       // sayfa timeout (30 saniye)
+const YAYIN_RE = /\/yayin\d+\.m3u8(\?|$)/i;
+const ANY_M3U8 = /\.m3u8(\?|$)/i;
 
-const app = express();
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// ---------- CORS ----------
-app.use(cors({
-  origin: [
-    "https://caneryilmazsports.vercel.app",
-    "http://localhost:5173",
-    "http://localhost:3000"
-  ],
-  credentials: true,
-}));
-
-app.use(express.json());
-app.get("/healthz", (_, res) => res.json({ ok: true }));
-
-// ---------- Keep-Alive Agent ----------
-const kaAgent = new https.Agent({ keepAlive: true });
-
-// ---------- Yol yardımcıları ----------
-const streamsPath = () => path.join(__dirname, "streams.json");
-const refererPath = () => path.join(__dirname, "referer.json");
-const domainPath  = () => path.join(__dirname, "domain.json");
-
-// ---------- Referer/Origin kaynağı ----------
-// Hem referer.json hem domain.json destekli (hangisi varsa)
-function getReferer() {
-  try {
-    if (fs.existsSync(refererPath())) {
-      const j = JSON.parse(fs.readFileSync(refererPath(), "utf-8"));
-      if (j?.referer) return j.referer;
-    }
-  } catch {}
-  try {
-    if (fs.existsSync(domainPath())) {
-      const j = JSON.parse(fs.readFileSync(domainPath(), "utf-8"));
-      // domain.json içinde { activeDomain: "https://trgoalsXXXX.xyz" } bekleriz
-      if (j?.activeDomain) return j.activeDomain;
-      if (j?.domain) return j.domain;
-    }
-  } catch {}
-  return null;
+function guessChrome() {
+  if (process.env.CHROME_PATH && fs.existsSync(process.env.CHROME_PATH))
+    return process.env.CHROME_PATH;
+  const plat = os.platform();
+  const candidates =
+    plat === "darwin"
+      ? ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"]
+      : plat === "win32"
+      ? [
+          `${process.env["PROGRAMFILES"]}\\Google\\Chrome\\Application\\chrome.exe`,
+          `${process.env["PROGRAMFILES(X86)"]}\\Google\\Chrome\\Application\\chrome.exe`,
+          `${process.env["LOCALAPPDATA"]}\\Google\\Chrome\\Application\\chrome.exe`,
+        ]
+      : ["/usr/bin/google-chrome-stable", "/usr/bin/google-chrome", "/usr/bin/chromium", "/snap/bin/chromium"];
+  return candidates.find((p) => p && fs.existsSync(p));
 }
 
-// ---------- Streams yükleme ----------
-// Yeni şema: { AUTO, byId:{}, channels:{}, _meta:{} }
-// Eski/düz şema: { "BeIN Sports 1": "https://...m3u8", ... }
-function loadStreams() {
+async function quickProbe(url) {
+  const agent = new https.Agent({ rejectUnauthorized: false });
   try {
-    if (!fs.existsSync(streamsPath())) return null;
-    const data = JSON.parse(fs.readFileSync(streamsPath(), "utf-8"));
-
-    // yeni şema
-    if (data && (data.AUTO || data.byId || data.channels)) return data;
-
-    // düz şemayı dönüştür
-    const channels = {};
-    for (const [k, v] of Object.entries(data || {})) {
-      if (typeof v === "string" && v.includes(".m3u8")) channels[k] = v;
-    }
-    const first = Object.values(channels)[0] || null;
-    return {
-      _meta: { migratedFromPlain: true, capturedAt: new Date().toISOString() },
-      AUTO: first,
-      channels,
-      byId: {},
-    };
+    const res = await fetch(url, {
+      method: "HEAD",
+      timeout: 3000,
+      agent,
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+        Accept: "*/*",
+      },
+    });
+    if (res.ok) return true;
+  } catch {}
+  try {
+    const res = await fetch(url, {
+      method: "GET",
+      timeout: 4000,
+      agent,
+      redirect: "manual",
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "tr-TR,tr;q=0.9",
+      },
+    });
+    return res.status === 200;
   } catch {
+    return false;
+  }
+}
+
+async function findActiveDomain(start = 1380, end = 1410) {
+  const base = "https://trgoals";
+  const tld = ".xyz";
+  for (let i = end; i >= start; i--) {
+    const url = `${base}${i}${tld}`;
+    try {
+      console.log("🔍 Deneniyor:", url);
+      const ok = await quickProbe(url);
+      if (ok) {
+        console.log("✅ Aktif domain:", url);
+        fs.writeFileSync("domain.json", JSON.stringify({ domain: url }, null, 2));
+        return url;
+      }
+    } catch (err) {
+      console.log(`⚠️ ${url} -> ${err?.message || "probe hata"}`);
+    }
+  }
+  throw new Error("❌ Aktif domain bulunamadı");
+}
+
+/* ---------- MAÇ LİSTESİ: önce HTTP, boşsa Puppeteer ---------- */
+async function fetchMatchesViaHTTP(activeDomain) {
+  try {
+    const res = await fetch(activeDomain, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+        "Accept-Language": "tr-TR,tr;q=0.9",
+        Accept: "text/html,*/*",
+      },
+      timeout: 10000,
+    });
+    if (!res.ok) throw new Error("status " + res.status);
+    const html = await res.text();
+
+    const sectionMatch = html.match(
+      /<div id="matches-tab"[^>]*class="[^"]*\btab-content\b[^"]*[^>]*>([\s\S]*?)<\/div>\s*<!--/i
+    );
+    const section = sectionMatch ? sectionMatch[1] : html;
+
+    const items = [];
+    const aRe = /<a\s+[^>]*class="[^"]*\bchannel-item\b[^"]*"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
+    let a;
+    while ((a = aRe.exec(section)) !== null) {
+      const href = a[1] || "";
+      const inner = a[2] || "";
+      const name = (inner.match(/<div[^>]*class="[^"]*\bchannel-name\b[^"]*"[^>]*>([\s\S]*?)<\/div>/i)?.[1] || "")
+        .replace(/<[^>]+>/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+      const time = (inner.match(/<div[^>]*class="[^"]*\bchannel-status\b[^"]*"[^>]*>([\s\S]*?)<\/div>/i)?.[1] || "")
+        .replace(/<[^>]+>/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+      const id =
+        href.match(/id=([^&"' >]+)/)?.[1] ||
+        (() => {
+          try {
+            const u = new URL(href, activeDomain);
+            return u.searchParams.get("id");
+          } catch {
+            return null;
+          }
+        })();
+      if (name) items.push({ title: name, time: time || null, id: id || null, href });
+    }
+
+    const seen = new Set();
+    const uniq = items.filter((r) => {
+      const k = [r.time, r.title, r.id].filter(Boolean).join("|").toLowerCase();
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+    return uniq;
+  } catch (e) {
+    console.log("HTTP match scrape hata:", e.message);
     return null;
   }
 }
 
-// id -> kanal adı (gerekirse genişlet)
-function channelNameFromId(id) {
-  const s = String(id || "").toLowerCase();
-  if (s === "yayin1" || s === "yayinb1") return "BeIN Sports 1";
-  if (s === "yayinb2") return "BeIN Sports 2";
-  if (s === "yayinb3") return "BeIN Sports 3";
-  if (s === "yayinb4") return "BeIN Sports 4";
-  return null;
-}
-
-function backendOrigin(req) {
-  return `${req.protocol}://${req.get("host")}`;
-}
-
-// m3u8 içini rewrite et → tüm URI’lar backend proxy’sine yönlensin
-function rewritePlaylist(text, baseUrl, beOrigin) {
-  const lines = text.split(/\r?\n/);
-  return lines.map(line => {
-    if (!line || line.startsWith("#")) return line;
-    const abs = new URL(line, baseUrl).href; // relative/absolute fark etmez
-    return `${beOrigin}/api/proxy?url=${encodeURIComponent(abs)}`;
-  }).join("\n");
-}
-
-// Key (isim/id/auto) → URL seç
-function pickStreamUrl(key, streams) {
-  if (!streams) return null;
-  if (key && streams.channels?.[key]) return streams.channels[key];
-  if (key && streams.byId?.[key])     return streams.byId[key];
-  if (!key || key === "auto") {
-    if (streams.AUTO) return streams.AUTO;
-    const byIdFirst = streams.byId && Object.values(streams.byId)[0];
-    if (byIdFirst) return byIdFirst;
-    const chFirst = streams.channels && Object.values(streams.channels)[0];
-    if (chFirst) return chFirst;
-  }
-  return null;
-}
-
-// ---------- Tanılama ----------
-app.get("/api/debug", (req, res) => {
-  const r = getReferer();
-  const streams = loadStreams();
-  const info = {
-    referer: r,
-    hasStreamsFile: fs.existsSync(streamsPath()),
-    streamsKeys: {
-      channels: streams?.channels ? Object.keys(streams.channels) : [],
-      byId:     streams?.byId ? Object.keys(streams.byId) : [],
-      AUTO:     !!streams?.AUTO
-    },
-    files: {
-      streamsMtime: fs.existsSync(streamsPath()) ? fs.statSync(streamsPath()).mtime : null,
-      refererMtime: fs.existsSync(refererPath()) ? fs.statSync(refererPath()).mtime : null,
-      domainMtime : fs.existsSync(domainPath())  ? fs.statSync(domainPath()).mtime  : null
-    },
-    backendOrigin: backendOrigin(req)
-  };
-  res.json(info);
-});
-
-app.get("/api/raw/streams", (_, res) => {
+async function scrapeMatchesViaPuppeteer(browser, activeDomain) {
+  const matchPage = await browser.newPage();
   try {
-    res.type("json").send(fs.readFileSync(streamsPath(), "utf-8"));
-  } catch {
-    res.status(404).send("{}");
-  }
-});
-
-// ---------- Proxy ----------
-app.get("/api/proxy", async (req, res) => {
-  try {
-    const src = req.query.url;
-    if (!src) return res.status(400).send("url param missing");
-
-    const u = new URL(src);
-    const ref = getReferer() || `${u.protocol}//${u.host}`;
-
-    const headers = {
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123 Safari/537.36",
-      "Accept": "*/*",
-      "Accept-Language": "tr-TR,tr;q=0.9",
-      "Referer": ref,
-      "Origin": ref
-    };
-    if (req.headers.range) headers.Range = req.headers.range;
-
-    const r = await fetch(src, { headers, redirect: "follow", agent: kaAgent });
-
-    res.status(r.status);
-
-    const ct = r.headers.get("content-type") || "application/octet-stream";
-    res.setHeader("Content-Type", ct);
-    res.setHeader("Cache-Control", "no-store");
-    const cl = r.headers.get("content-length");
-    if (cl) res.setHeader("Content-Length", cl);
-    const ar = r.headers.get("accept-ranges");
-    if (ar) res.setHeader("Accept-Ranges", ar);
-
-    if (!r.ok && r.status !== 206) {
-      const body = await r.text().catch(()=> "");
-      console.error("proxy upstream error:", r.status, src, body.slice(0,200));
-      return res.end(body);
-    }
-
-    const buf = Buffer.from(await r.arrayBuffer());
-    return res.end(buf);
-  } catch (err) {
-    console.error("proxy error:", err);
-    res.status(500).send("proxy failed");
-  }
-});
-
-// ---------- Stream by key (isim/id/auto) ----------
-app.get("/api/stream/:key", async (req, res) => {
-  try {
-    const key = decodeURIComponent(req.params.key || "");
-    const streams = loadStreams();
-    const src = pickStreamUrl(key, streams);
-    if (!src) return res.status(404).send("stream not found");
-
-    const u = new URL(src);
-    const ref = getReferer() || `${u.protocol}//${u.host}`;
-
-    const r = await fetch(src, {
-      headers: {
-        "User-Agent": "Mozilla/5.0",
-        "Accept": "*/*",
-        "Accept-Language": "tr-TR,tr;q=0.9",
-        "Referer": ref,
-        "Origin": ref
-      },
-      redirect: "follow",
-      agent: kaAgent
-    });
-
-    if (!r.ok) {
-      const body = await r.text().catch(()=> "");
-      console.error("stream upstream error:", r.status, src, body.slice(0,200));
-      return res.status(r.status).end(body);
-    }
-
-    const text = await r.text();
-    const rewritten = rewritePlaylist(text, src, backendOrigin(req));
-    res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
-    res.setHeader("Cache-Control", "no-store");
-    res.send(rewritten);
-  } catch (err) {
-    console.error("stream error:", err);
-    res.status(500).send("stream failed");
-  }
-});
-
-// ---------- Stream by ID (örn. yayin1) ----------
-app.get("/api/stream-id/:id", async (req, res) => {
-  try {
-    const id = decodeURIComponent(req.params.id || "");
-    const streams = loadStreams();
-
-    // 1) byId doğrudan URL ise
-    if (streams?.byId?.[id]) {
-      const url = streams.byId[id];
-      const u = new URL(url);
-      const ref = getReferer() || `${u.protocol}//${u.host}`;
-      const r = await fetch(url, {
-        headers: {
-          "User-Agent": "Mozilla/5.0",
-          "Accept": "*/*",
-          "Accept-Language": "tr-TR,tr;q=0.9",
-          "Referer": ref,
-          "Origin": ref
-        },
-        redirect: "follow",
-        agent: kaAgent
-      });
-      if (!r.ok) {
-        const body = await r.text().catch(()=> "");
-        console.error("stream-id upstream error:", r.status, url, body.slice(0,200));
-        return res.status(r.status).end(body);
+    await matchPage.goto(activeDomain, { waitUntil: "domcontentloaded", timeout: 30000 });
+    await matchPage.waitForSelector("#matches-tab a.channel-item", { timeout: 10000 }).catch(() => {});
+    
+    // Retry mekanizması ile $$eval
+    let rows = [];
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        rows = await matchPage.$$eval("#matches-tab a.channel-item", (as) =>
+          as.map((a) => {
+            const name = a.querySelector(".channel-name")?.textContent?.trim() || "";
+            const time = a.querySelector(".channel-status")?.textContent?.trim() || "";
+            const href = a.getAttribute("href") || "";
+            const id = (() => {
+              try {
+                const u = new URL(href, location.origin);
+                return u.searchParams.get("id");
+              } catch {
+                const m = href.match(/id=([^&]+)/);
+                return m ? m[1] : null;
+              }
+            })();
+            return { title: name, time: time || null, id: id || null, href: href || null };
+          })
+        );
+        break; // Başarılı olursa döngüden çık
+      } catch (e) {
+        console.log(`$$eval deneme ${attempt + 1} başarısız:`, e.message);
+        if (attempt < 2) {
+          await sleep(2000); // 2 saniye bekle ve tekrar dene
+        }
       }
-      const text = await r.text();
-      const rewritten = rewritePlaylist(text, url, backendOrigin(req));
-      res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
-      res.setHeader("Cache-Control", "no-store");
-      return res.send(rewritten);
     }
-
-    // 2) id -> kanal adı
-    const name = channelNameFromId(id);
-    if (!name) return res.status(404).send("Unknown id");
-
-    const url2 = pickStreamUrl(name, streams);
-    if (!url2) return res.status(404).send("Channel stream not found");
-
-    const u2 = new URL(url2);
-    const ref2 = getReferer() || `${u2.protocol}//${u2.host}`;
-    const r2 = await fetch(url2, {
-      headers: {
-        "User-Agent": "Mozilla/5.0",
-        "Accept": "*/*",
-        "Accept-Language": "tr-TR,tr;q=0.9",
-        "Referer": ref2,
-        "Origin": ref2
-      },
-      redirect: "follow",
-      agent: kaAgent
+    
+    const seen = new Set();
+    const filtered = rows.filter((r) => {
+      if (!r.title) return false;
+      const k = [r.time, r.title, r.id].filter(Boolean).join("|").toLowerCase();
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
     });
-    if (!r2.ok) {
-      const body = await r2.text().catch(()=> "");
-      console.error("stream-id upstream error:", r2.status, url2, body.slice(0,200));
-      return res.status(r2.status).end(body);
-    }
-    const text2 = await r2.text();
-    const rewritten2 = rewritePlaylist(text2, url2, backendOrigin(req));
-    res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
-    res.setHeader("Cache-Control", "no-store");
-    res.send(rewritten2);
-  } catch (err) {
-    console.error("stream error:", err);
-    res.status(500).send("stream failed");
+    
+    return filtered;
+  } catch (e) {
+    console.log("Puppeteer match scrape hata:", e.message);
+    return null;
+  } finally {
+    await matchPage.close();
   }
-});
-
-// ---------- Kanal isimleri ----------
-app.get("/api/channels", (_, res) => {
-  const streams = loadStreams();
-  if (!streams) return res.json([]);
-  const names = new Set();
-  if (streams.channels) for (const k of Object.keys(streams.channels)) names.add(k);
-  if (streams.byId?.yayin1 && !names.has("BeIN Sports 1")) names.add("BeIN Sports 1");
-  res.json([...names]);
-});
-
-// ---------- helper.js güvenli tetikleme (DEBOUNCE + KİLİT) ----------
-let helperTimer = null;
-let helperInFlight = false;
-let lastHelperAt = 0;
-
-function runHelperOnce(reason = "manual") {
-  const now = Date.now();
-  if (helperInFlight) {
-    console.log(`[helper] skip: already running (${reason})`);
-    return;
-  }
-  if (now - lastHelperAt < 60_000) {
-    console.log(`[helper] skip: debounced (${reason})`);
-    return;
-  }
-  lastHelperAt = now;
-  helperInFlight = true;
-
-  const helperPath = path.join(__dirname, "helper.js");
-  if (!fs.existsSync(helperPath)) {
-    console.warn("helper.js yok, atlanıyor.");
-    helperInFlight = false;
-    return;
-  }
-
-  console.log("[helper] Başlatılıyor...");
-  const child = spawn("node", [helperPath], {
-    cwd: __dirname,
-    env: { ...process.env },
-    stdio: ["ignore", "pipe", "pipe"]
-  });
-  child.stdout.on("data", d => process.stdout.write(String(d)));
-  child.stderr.on("data", d => process.stderr.write(String(d)));
-  child.on("close", code => {
-    console.log(`[helper] bitti. exit code: ${code}`);
-    helperInFlight = false;
-  });
 }
 
-// ayağa kalkınca 1 kere – sonra 5 dakikada bir
-runHelperOnce("startup");
-helperTimer = setInterval(() => runHelperOnce("interval"), 5 * 60 * 1000);
+async function collectMatches(activeDomain, browser) {
+  let list = await fetchMatchesViaHTTP(activeDomain);
+  if (!list || list.length === 0) {
+    console.log('HTTP ile maç bulunamadı, Puppeteer deneniyor...');
+    list = await scrapeMatchesViaPuppeteer(browser, activeDomain);
+  }
+  const out = Array.isArray(list) ? list : [];
+  fs.writeFileSync(path.join(process.cwd(), "matches.json"), JSON.stringify(out, null, 2), "utf-8");
+  console.log(`✅ matches.json yazıldı — ${out.length} kayıt`);
+}
 
-process.on("SIGINT", () => {
-  if (helperTimer) clearInterval(helperTimer);
-  console.log("\nKapanıyor...");
+/* ---------- m3u8 yakala ve streams.json üret ---------- */
+(async () => {
+  const chromePath = guessChrome();
+  console.log('Chrome path:', chromePath);
+  if (!chromePath) {
+    console.error("❌ Chrome/Chromium bulunamadı. CHROME_PATH ile yol ver.");
+    console.log('Available paths checked:', ["/usr/bin/google-chrome-stable", "/usr/bin/google-chrome", "/usr/bin/chromium"]);
+    process.exit(2);
+  }
+
+  const activeDomain = await findActiveDomain(1380, 1410);
+  const TARGET = `${activeDomain}/channel.html?id=yayin1`;
+
+  const browser = await puppeteer.launch({
+    headless: true,
+    executablePath: chromePath,
+    defaultViewport: { width: 800, height: 600 },
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu",
+      "--disable-web-security",
+      "--disable-features=VizDisplayCompositor",
+      "--disable-images", // Resim yüklemeyi devre dışı bırak
+      "--disable-javascript", // JS'i devre dışı bırak (sadece network dinliyoruz)
+      "--disable-plugins",
+      "--disable-extensions",
+      "--autoplay-policy=no-user-gesture-required",
+      "--mute-audio",
+    ],
+  });
+
+  const page = await browser.newPage();
+  await page.setUserAgent(
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+  );
+  await page.setExtraHTTPHeaders({ "Accept-Language": "tr-TR,tr;q=0.9" });
+
+  const cdp = await page.target().createCDPSession();
+  await cdp.send("Network.enable");
+  await cdp.send("Network.setCacheDisabled", { cacheDisabled: true });
+
+  let strongHit = null;
+  let lastAny = null;
+  let resolveHit;
+  const hitPromise = new Promise((r) => (resolveHit = r));
+
+  const consider = (url) => {
+    if (!url) return;
+    // Sadece m3u8 URL'lerini log'la, gereksiz trafiği azalt
+    if (url.includes('.m3u8')) {
+      console.log('M3U8 URL kontrol ediliyor:', url);
+    }
+    if (YAYIN_RE.test(url)) {
+      strongHit = url;
+      console.log("✅ m3u8 bulundu:", url);
+
+      const baseUrl = url.split(/yayin\d+\.m3u8/i)[0];
+      const channels = {
+        "BeIN Sports 1": "yayin1.m3u8",
+        "BeIN Sports 2": "yayinb2.m3u8",
+        "BeIN Sports 3": "yayinb3.m3u8",
+        "BeIN Sports 4": "yayinb4.m3u8",
+        "BeIN Max 1": "yayinbm1.m3u8",
+        "BeIN Max 2": "yayinbm2.m3u8",
+        "S Sport": "yayinss.m3u8",
+        "S Sport 2": "yayinss2.m3u8",
+        "Tivibu 1": "yayint1.m3u8",
+        "Tivibu 2": "yayint2.m3u8",
+        "Tivibu 3": "yayint3.m3u8",
+        "Tivibu 4": "yayint4.m3u8",
+        "TRT Spor": "yayintrtspor.m3u8",
+        "TRT Spor 2": "yayintrtspor2.m3u8",
+        "TRT 1": "yayintrt1.m3u8",
+        "A Spor": "yayinas.m3u8",
+        "ATV": "yayinatv.m3u8",
+        "TV 8": "yayintv8.m3u8",
+        "TV 8,5": "yayintv85.m3u8",
+        "NBA TV": "yayinnbatv.m3u8",
+        "Euro Sport 1": "yayineu1.m3u8",
+        "Euro Sport 2": "yayineu2.m3u8",
+      };
+
+      const streams = {};
+      for (const [name, pathUrl] of Object.entries(channels)) {
+        const fullUrl = new URL(pathUrl, baseUrl).href;
+        streams[name] = fullUrl;
+      }
+      fs.writeFileSync(path.join(process.cwd(), "streams.json"), JSON.stringify(streams, null, 2));
+      resolveHit();
+    } else if (ANY_M3U8.test(url)) {
+      lastAny = url;
+    }
+  };
+
+  // Sadece m3u8 içeren istekleri dinle
+  cdp.on("Network.requestWillBeSent", (e) => {
+    const url = e?.request?.url;
+    if (url && url.includes('.m3u8')) consider(url);
+  });
+  cdp.on("Network.responseReceived", (e) => {
+    const url = e?.response?.url;
+    if (url && url.includes('.m3u8')) consider(url);
+  });
+  page.on("request", (req) => {
+    const url = req.url();
+    if (url && url.includes('.m3u8')) consider(url);
+  });
+  page.on("response", (res) => {
+    const url = res.url();
+    if (url && url.includes('.m3u8')) consider(url);
+  });
+
+  console.log('Hedef URL:', TARGET);
+  try {
+    console.log('Sayfaya gidiliyor...');
+    await page.goto(TARGET, { waitUntil: "domcontentloaded", timeout: NAV_TIMEOUT });
+    console.log('Sayfa yüklendi, m3u8 bekleniyor...');
+  } catch (e) {
+    console.log('Sayfa yüklenme hatası:', e.message);
+  }
+
+  console.log('M3u8 bekleniyor... (2 dakika)');
+  await Promise.race([hitPromise, sleep(LISTEN_MS)]);
+  
+  if (!strongHit && lastAny) {
+    console.log('⚠️ Yayin m3u8 bulunamadı ama genel m3u8 bulundu:', lastAny);
+  } else if (!strongHit) {
+    console.error("❌ m3u8 yakalanamadı");
+  }
+
+  // --- MAÇ LİSTESİ (HTTP → Puppeteer fallback) ---
+  await collectMatches(activeDomain, browser);
+
+  try { await cdp.detach(); } catch {}
+  await browser.close();
   process.exit(0);
+})().catch((e) => {
+  console.error(e?.stack || e);
+  process.exit(1);
 });
-
-// ---------- Listen ----------
-const PORT = process.env.PORT || 5001;
-app.listen(PORT, () => console.log(`Backend ${PORT} portunda çalışıyor`));

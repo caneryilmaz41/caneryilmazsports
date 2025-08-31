@@ -231,15 +231,13 @@ async function collectMatches(activeDomain, browser) {
       "--no-sandbox",
       "--disable-setuid-sandbox",
       "--disable-dev-shm-usage",
-      "--disable-accelerated-2d-canvas",
-      "--no-first-run",
-      "--no-zygote",
-      "--single-process",
       "--disable-gpu",
       "--disable-web-security",
       "--disable-features=VizDisplayCompositor",
-      "--memory-pressure-off",
-      "--max_old_space_size=512",
+      "--disable-images", // Resim yüklemeyi devre dışı bırak
+      "--disable-javascript", // JS'i devre dışı bırak (sadece network dinliyoruz)
+      "--disable-plugins",
+      "--disable-extensions",
       "--autoplay-policy=no-user-gesture-required",
       "--mute-audio",
     ],
@@ -262,7 +260,10 @@ async function collectMatches(activeDomain, browser) {
 
   const consider = (url) => {
     if (!url) return;
-    console.log('URL kontrol ediliyor:', url); // Debug
+    // Sadece m3u8 URL'lerini log'la, gereksiz trafiği azalt
+    if (url.includes('.m3u8')) {
+      console.log('M3U8 URL kontrol ediliyor:', url);
+    }
     if (YAYIN_RE.test(url)) {
       strongHit = url;
       console.log("✅ m3u8 bulundu:", url);
@@ -305,19 +306,31 @@ async function collectMatches(activeDomain, browser) {
     }
   };
 
-  cdp.on("Network.requestWillBeSent", (e) => consider(e?.request?.url));
-  cdp.on("Network.responseReceived", (e) => consider(e?.response?.url));
-  page.on("request", (req) => consider(req.url()));
-  page.on("response", (res) => consider(res.url()));
+  // Sadece m3u8 içeren istekleri dinle
+  cdp.on("Network.requestWillBeSent", (e) => {
+    const url = e?.request?.url;
+    if (url && url.includes('.m3u8')) consider(url);
+  });
+  cdp.on("Network.responseReceived", (e) => {
+    const url = e?.response?.url;
+    if (url && url.includes('.m3u8')) consider(url);
+  });
+  page.on("request", (req) => {
+    const url = req.url();
+    if (url && url.includes('.m3u8')) consider(url);
+  });
+  page.on("response", (res) => {
+    const url = res.url();
+    if (url && url.includes('.m3u8')) consider(url);
+  });
 
   console.log('Hedef URL:', TARGET);
   try {
     console.log('Sayfaya gidiliyor...');
-    await page.goto(TARGET, { waitUntil: "networkidle0", timeout: NAV_TIMEOUT });
-    console.log('Sayfa yüklendi, network dinleniyor...');
+    await page.goto(TARGET, { waitUntil: "domcontentloaded", timeout: NAV_TIMEOUT });
+    console.log('Sayfa yüklendi, m3u8 bekleniyor...');
   } catch (e) {
     console.log('Sayfa yüklenme hatası:', e.message);
-    // Hata olsa bile devam et
   }
 
   console.log('M3u8 bekleniyor... (2 dakika)');

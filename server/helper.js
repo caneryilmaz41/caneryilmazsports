@@ -6,8 +6,8 @@ import fetch from "node-fetch";
 import path from "path";
 import https from "https";
 
-const LISTEN_MS = 120000;        // m3u8 dinleme süresi (3 dakika)
-const NAV_TIMEOUT = 15000;       // sayfa timeout (30 saniye)
+const LISTEN_MS = 90000;         // m3u8 dinleme süresi (1.5 dakika)
+const NAV_TIMEOUT = 20000;       // sayfa timeout (20 saniye)
 const YAYIN_RE = /\/yayin\d+\.m3u8(\?|$)/i;
 const ANY_M3U8 = /\.m3u8(\?|$)/i;
 
@@ -294,37 +294,38 @@ async function collectMatches(activeDomain, page) {
     console.error('Sayfa yüklenme hatası:', e.message);
   }
   
-  // Daha fazla etkileşim dene
+  // Basit etkileşim - mouse click yerine keyboard
   try { 
-    console.log('Mouse click yapılıyor...');
-    await page.mouse.click(640, 360, { clickCount: 1 }); 
-    await sleep(1000);
-    await page.mouse.click(300, 300, { clickCount: 1 }); 
-    console.log('Mouse click tamamlandı');
+    console.log('Sayfa etkileşimi başlatılıyor...');
+    await page.keyboard.press('Space'); // Space tuşuna bas
+    await sleep(500);
+    console.log('Keyboard etkileşimi tamamlandı');
   } catch (e) {
-    console.error('Mouse click hatası:', e.message);
+    console.log('Keyboard etkileşim hatası:', e.message);
   }
   
   try {
+    console.log('Video oynatma denenecek...');
     await page.evaluate(() => {
       const tryPlay = () => { 
+        console.log('Video aranıyor...');
         const v = document.querySelector("video"); 
         if (v) {
+          console.log('Video bulundu, oynatılıyor...');
           v.muted = true;
-          v.play().catch(() => {});
+          v.play().catch(e => console.log('Video play hatası:', e));
+        } else {
+          console.log('Video elementi bulunamadı');
         }
-        // Play butonlarını da dene
-        const playBtns = document.querySelectorAll('button, .play-btn, [class*="play"]');
-        playBtns.forEach(btn => {
-          try { btn.click(); } catch {}
-        });
       };
       tryPlay(); 
-      setTimeout(tryPlay, 1000); 
-      setTimeout(tryPlay, 3000);
+      setTimeout(tryPlay, 2000); 
       setTimeout(tryPlay, 5000);
     });
-  } catch {}
+    console.log('Video oynatma kodu çalıştırıldı');
+  } catch (e) {
+    console.error('Video oynatma hatası:', e.message);
+  }
 
   console.log('M3u8 bekleniyor... (3 dakika)');
   await Promise.race([hitPromise, sleep(LISTEN_MS)]);

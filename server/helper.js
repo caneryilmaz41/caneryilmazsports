@@ -6,8 +6,8 @@ import fetch from "node-fetch";
 import path from "path";
 import https from "https";
 
-const LISTEN_MS = 60000;         // m3u8 dinleme süresi (1 dakika)
-const NAV_TIMEOUT = 15000;       // sayfa timeout (15 saniye)
+const LISTEN_MS = 120000;        // m3u8 dinleme süresi (2 dakika)
+const NAV_TIMEOUT = 30000;       // sayfa timeout (30 saniye)
 const YAYIN_RE = /\/yayin\d+\.m3u8(\?|$)/i;
 const ANY_M3U8 = /\.m3u8(\?|$)/i;
 
@@ -145,44 +145,66 @@ async function fetchMatchesViaHTTP(activeDomain) {
   }
 }
 
-async function scrapeMatchesViaPuppeteer(page, activeDomain) {
+async function scrapeMatchesViaPuppeteer(browser, activeDomain) {
+  const matchPage = await browser.newPage();
   try {
-    await page.goto(activeDomain, { waitUntil: "domcontentloaded", timeout: 20000 });
-    await page.waitForSelector("#matches-tab a.channel-item", { timeout: 5000 }).catch(() => {});
-    const rows = await page.$$eval("#matches-tab a.channel-item", (as) =>
-      as.map((a) => {
-        const name = a.querySelector(".channel-name")?.textContent?.trim() || "";
-        const time = a.querySelector(".channel-status")?.textContent?.trim() || "";
-        const href = a.getAttribute("href") || "";
-        const id = (() => {
-          try {
-            const u = new URL(href, location.origin);
-            return u.searchParams.get("id");
-          } catch {
-            const m = href.match(/id=([^&]+)/);
-            return m ? m[1] : null;
-          }
-        })();
-        return { title: name, time: time || null, id: id || null, href: href || null };
-      })
-    );
+    await matchPage.goto(activeDomain, { waitUntil: "domcontentloaded", timeout: 30000 });
+    await matchPage.waitForSelector("#matches-tab a.channel-item", { timeout: 10000 }).catch(() => {});
+    
+    // Retry mekanizması ile $$eval
+    let rows = [];
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        rows = await matchPage.$$eval("#matches-tab a.channel-item", (as) =>
+          as.map((a) => {
+            const name = a.querySelector(".channel-name")?.textContent?.trim() || "";
+            const time = a.querySelector(".channel-status")?.textContent?.trim() || "";
+            const href = a.getAttribute("href") || "";
+            const id = (() => {
+              try {
+                const u = new URL(href, location.origin);
+                return u.searchParams.get("id");
+              } catch {
+                const m = href.match(/id=([^&]+)/);
+                return m ? m[1] : null;
+              }
+            })();
+            return { title: name, time: time || null, id: id || null, href: href || null };
+          })
+        );
+        break; // Başarılı olursa döngüden çık
+      } catch (e) {
+        console.log(`$$eval deneme ${attempt + 1} başarısız:`, e.message);
+        if (attempt < 2) {
+          await sleep(2000); // 2 saniye bekle ve tekrar dene
+        }
+      }
+    }
+    
     const seen = new Set();
-    return rows.filter((r) => {
+    const filtered = rows.filter((r) => {
       if (!r.title) return false;
       const k = [r.time, r.title, r.id].filter(Boolean).join("|").toLowerCase();
       if (seen.has(k)) return false;
       seen.add(k);
       return true;
     });
+    
+    return filtered;
   } catch (e) {
     console.log("Puppeteer match scrape hata:", e.message);
     return null;
+  } finally {
+    await matchPage.close();
   }
 }
 
-async function collectMatches(activeDomain, page) {
+async function collectMatches(activeDomain, browser) {
   let list = await fetchMatchesViaHTTP(activeDomain);
-  if (!list || list.length === 0) list = await scrapeMatchesViaPuppeteer(page, activeDomain);
+  if (!list || list.length === 0) {
+    console.log('HTTP ile maç bulunamadı, Puppeteer deneniyor...');
+    list = await scrapeMatchesViaPuppeteer(browser, activeDomain);
+  }
   const out = Array.isArray(list) ? list : [];
   fs.writeFileSync(path.join(process.cwd(), "matches.json"), JSON.stringify(out, null, 2), "utf-8");
   console.log(`✅ matches.json yazıldı — ${out.length} kayıt`);
@@ -298,7 +320,7 @@ async function collectMatches(activeDomain, page) {
     // Hata olsa bile devam et
   }
 
-  console.log('M3u8 bekleniyor... (1.5 dakika)');
+  console.log('M3u8 bekleniyor... (2 dakika)');
   await Promise.race([hitPromise, sleep(LISTEN_MS)]);
   
   if (!strongHit && lastAny) {
@@ -308,7 +330,7 @@ async function collectMatches(activeDomain, page) {
   }
 
   // --- MAÇ LİSTESİ (HTTP → Puppeteer fallback) ---
-  await collectMatches(activeDomain, page);
+  await collectMatches(activeDomain, browser);
 
   try { await cdp.detach(); } catch {}
   await browser.close();

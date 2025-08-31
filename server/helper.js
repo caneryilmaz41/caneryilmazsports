@@ -26,7 +26,7 @@ function guessChrome() {
           `${process.env["PROGRAMFILES(X86)"]}\\Google\\Chrome\\Application\\chrome.exe`,
           `${process.env["LOCALAPPDATA"]}\\Google\\Chrome\\Application\\chrome.exe`,
         ]
-      : ["/usr/bin/google-chrome", "/usr/bin/chromium", "/snap/bin/chromium"];
+      : ["/usr/bin/google-chrome-stable", "/usr/bin/google-chrome", "/usr/bin/chromium", "/snap/bin/chromium"];
   return candidates.find((p) => p && fs.existsSync(p));
 }
 
@@ -206,6 +206,12 @@ async function collectMatches(activeDomain, page) {
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-accelerated-2d-canvas",
+      "--no-first-run",
+      "--no-zygote",
+      "--single-process",
+      "--disable-gpu",
       "--autoplay-policy=no-user-gesture-required",
       "--mute-audio",
     ],

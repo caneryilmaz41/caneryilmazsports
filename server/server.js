@@ -12,9 +12,16 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(cors({
-  origin: ['https://caneryilmazsports.vercel.app', 'http://localhost:5173'],
-  credentials: true
+  origin: ['https://caneryilmazsports.vercel.app', 'http://localhost:5173', 'http://localhost:3000'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
 
 // --- helper.js otomatik çalıştırma (periyodik) ---
 let helperRunning = false;
@@ -24,15 +31,19 @@ function runHelperOnce() {
   if (helperRunning) return; // aynı anda birden fazla helper çalışmasın
   helperRunning = true;
 
+  console.log('[helper] Başlatılıyor...');
   const child = spawn(process.execPath, ["helper.js"], {
     stdio: "inherit",
     cwd: __dirname, // helper.js server ile aynı klasörde
-    env: process.env,
+    env: { ...process.env, CHROME_PATH: process.env.CHROME_PATH || '/usr/bin/google-chrome-stable' },
   });
 
   child.on("close", (code) => {
     helperRunning = false;
     console.log(`[helper] bitti. exit code: ${code}`);
+    if (code !== 0) {
+      console.error(`[helper] Hata ile kapandı: ${code}`);
+    }
   });
 
   child.on("error", (err) => {

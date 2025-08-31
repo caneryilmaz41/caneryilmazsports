@@ -2,8 +2,7 @@ services:
   - type: web
     name: caneryilmazsports-backend
     env: docker
-    dockerfilePath: ./server/Dockerfile
-    dockerContext: ./server
+    dockerfilePath: ./Dockerfile
     plan: starter
     region: frankfurt
     branch: main

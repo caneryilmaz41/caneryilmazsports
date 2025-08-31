@@ -6,8 +6,8 @@ import fetch from "node-fetch";
 import path from "path";
 import https from "https";
 
-const LISTEN_MS = 90000;         // m3u8 dinleme süresi (1.5 dakika)
-const NAV_TIMEOUT = 20000;       // sayfa timeout (20 saniye)
+const LISTEN_MS = 60000;         // m3u8 dinleme süresi (1 dakika)
+const NAV_TIMEOUT = 15000;       // sayfa timeout (15 saniye)
 const YAYIN_RE = /\/yayin\d+\.m3u8(\?|$)/i;
 const ANY_M3U8 = /\.m3u8(\?|$)/i;
 
@@ -204,7 +204,7 @@ async function collectMatches(activeDomain, page) {
   const browser = await puppeteer.launch({
     headless: true,
     executablePath: chromePath,
-    defaultViewport: { width: 1280, height: 800 },
+    defaultViewport: { width: 800, height: 600 },
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
@@ -214,6 +214,10 @@ async function collectMatches(activeDomain, page) {
       "--no-zygote",
       "--single-process",
       "--disable-gpu",
+      "--disable-web-security",
+      "--disable-features=VizDisplayCompositor",
+      "--memory-pressure-off",
+      "--max_old_space_size=512",
       "--autoplay-policy=no-user-gesture-required",
       "--mute-audio",
     ],
@@ -287,63 +291,20 @@ async function collectMatches(activeDomain, page) {
   console.log('Hedef URL:', TARGET);
   try {
     console.log('Sayfaya gidiliyor...');
-    await page.goto(TARGET, { waitUntil: "domcontentloaded", timeout: NAV_TIMEOUT });
-    console.log('Sayfa yüklendi, 3 saniye bekleniyor...');
-    await sleep(3000);
+    await page.goto(TARGET, { waitUntil: "networkidle0", timeout: NAV_TIMEOUT });
+    console.log('Sayfa yüklendi, network dinleniyor...');
   } catch (e) {
-    console.error('Sayfa yüklenme hatası:', e.message);
-  }
-  
-  // Basit etkileşim - mouse click yerine keyboard
-  try { 
-    console.log('Sayfa etkileşimi başlatılıyor...');
-    await page.keyboard.press('Space'); // Space tuşuna bas
-    await sleep(500);
-    console.log('Keyboard etkileşimi tamamlandı');
-  } catch (e) {
-    console.log('Keyboard etkileşim hatası:', e.message);
-  }
-  
-  try {
-    console.log('Video oynatma denenecek...');
-    await page.evaluate(() => {
-      const tryPlay = () => { 
-        console.log('Video aranıyor...');
-        const v = document.querySelector("video"); 
-        if (v) {
-          console.log('Video bulundu, oynatılıyor...');
-          v.muted = true;
-          v.play().catch(e => console.log('Video play hatası:', e));
-        } else {
-          console.log('Video elementi bulunamadı');
-        }
-      };
-      tryPlay(); 
-      setTimeout(tryPlay, 2000); 
-      setTimeout(tryPlay, 5000);
-    });
-    console.log('Video oynatma kodu çalıştırıldı');
-  } catch (e) {
-    console.error('Video oynatma hatası:', e.message);
+    console.log('Sayfa yüklenme hatası:', e.message);
+    // Hata olsa bile devam et
   }
 
-  console.log('M3u8 bekleniyor... (3 dakika)');
+  console.log('M3u8 bekleniyor... (1.5 dakika)');
   await Promise.race([hitPromise, sleep(LISTEN_MS)]);
   
   if (!strongHit && lastAny) {
     console.log('⚠️ Yayin m3u8 bulunamadı ama genel m3u8 bulundu:', lastAny);
   } else if (!strongHit) {
     console.error("❌ m3u8 yakalanamadı");
-    console.log('Son deneme: sayfa yenileme ve tekrar deneme');
-    try {
-      await page.reload({ waitUntil: 'domcontentloaded', timeout: 15000 });
-      await sleep(5000);
-      await page.evaluate(() => {
-        const v = document.querySelector("video");
-        if (v) { v.muted = true; v.play().catch(() => {}); }
-      });
-      await sleep(10000); // 10 saniye daha bekle
-    } catch {}
   }
 
   // --- MAÇ LİSTESİ (HTTP → Puppeteer fallback) ---

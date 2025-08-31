@@ -87,9 +87,11 @@ function getReferer() {
   try {
     const p = path.join(__dirname, "domain.json");
     const { domain } = JSON.parse(fs.readFileSync(p, "utf-8"));
-    return domain || "https://trgoals1383.xyz/"; // fallback
+    console.log(`[referer] Domain.json'dan okunan: ${domain}`);
+    return domain || "https://trgoals1391.xyz/"; // güncel fallback
   } catch {
-    return "https://trgoals1383.xyz/"; // fallback
+    console.log('[referer] Domain.json okunamadı, fallback kullanılıyor');
+    return "https://trgoals1391.xyz/"; // güncel fallback
   }
 }
 
@@ -118,9 +120,12 @@ app.get("/api/stream/:channel", async (req, res) => {
     }
 
     console.log(`[stream] ${channel} -> ${url}`);
+    const referer = getReferer();
+    console.log(`[stream] Referer: ${referer}`);
+    
     const response = await fetch(url, {
       headers: {
-        Referer: getReferer(),
+        Referer: referer,
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         Accept: "*/*",
         "Accept-Encoding": "identity",

@@ -117,15 +117,20 @@ app.get("/api/stream/:channel", async (req, res) => {
       return res.status(404).send("Channel not found");
     }
 
+    console.log(`[stream] ${channel} -> ${url}`);
     const response = await fetch(url, {
       headers: {
         Referer: getReferer(),
-        "User-Agent": "Mozilla/5.0",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         Accept: "*/*",
+        "Accept-Encoding": "identity",
+        "Cache-Control": "no-cache",
       },
+      timeout: 15000,
     });
 
     if (!response.ok) {
+      console.error(`[stream] Upstream error: ${response.status} for ${url}`);
       return res.status(502).send("Upstream error: " + response.status);
     }
 
@@ -133,10 +138,13 @@ app.get("/api/stream/:channel", async (req, res) => {
       "Content-Type",
       response.headers.get("content-type") || "application/vnd.apple.mpegurl"
     );
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Cache-Control", "no-cache");
 
     const body = Buffer.from(await response.arrayBuffer());
     res.send(body);
   } catch (err) {
+    console.error(`[stream] Error: ${err.message}`);
     res.status(500).send("Stream error: " + err.message);
   }
 });
@@ -216,7 +224,14 @@ app.get("/api/stream-id/:id", async (req, res) => {
     if (!url) return res.status(404).send("Channel stream not found");
 
     const response = await fetch(url, {
-      headers: { Referer: getReferer(), "User-Agent": "Mozilla/5.0", Accept: "*/*" },
+      headers: {
+        Referer: getReferer(),
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        Accept: "*/*",
+        "Accept-Encoding": "identity",
+        "Cache-Control": "no-cache",
+      },
+      timeout: 15000,
     });
     if (!response.ok) return res.status(502).send("Upstream error: " + response.status);
 

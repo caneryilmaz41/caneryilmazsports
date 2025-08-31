@@ -6,8 +6,8 @@ import fetch from "node-fetch";
 import path from "path";
 import https from "https";
 
-const LISTEN_MS = 120000;        // m3u8 dinleme süresi
-const NAV_TIMEOUT = 15000;       // sayfa timeout
+const LISTEN_MS = 120000;        // m3u8 dinleme süresi (3 dakika)
+const NAV_TIMEOUT = 15000;       // sayfa timeout (30 saniye)
 const YAYIN_RE = /\/yayin\d+\.m3u8(\?|$)/i;
 const ANY_M3U8 = /\.m3u8(\?|$)/i;
 
@@ -191,8 +191,10 @@ async function collectMatches(activeDomain, page) {
 /* ---------- m3u8 yakala ve streams.json üret ---------- */
 (async () => {
   const chromePath = guessChrome();
+  console.log('Chrome path:', chromePath);
   if (!chromePath) {
     console.error("❌ Chrome/Chromium bulunamadı. CHROME_PATH ile yol ver.");
+    console.log('Available paths checked:', ["/usr/bin/google-chrome-stable", "/usr/bin/google-chrome", "/usr/bin/chromium"]);
     process.exit(2);
   }
 
@@ -234,6 +236,7 @@ async function collectMatches(activeDomain, page) {
 
   const consider = (url) => {
     if (!url) return;
+    console.log('URL kontrol ediliyor:', url); // Debug
     if (YAYIN_RE.test(url)) {
       strongHit = url;
       console.log("✅ m3u8 bulundu:", url);
@@ -281,20 +284,66 @@ async function collectMatches(activeDomain, page) {
   page.on("request", (req) => consider(req.url()));
   page.on("response", (res) => consider(res.url()));
 
+  console.log('Hedef URL:', TARGET);
   try {
+    console.log('Sayfaya gidiliyor...');
     await page.goto(TARGET, { waitUntil: "domcontentloaded", timeout: NAV_TIMEOUT });
-  } catch {}
-  try { await page.mouse.click(300, 300, { clickCount: 1 }); } catch {}
+    console.log('Sayfa yüklendi, 3 saniye bekleniyor...');
+    await sleep(3000);
+  } catch (e) {
+    console.error('Sayfa yüklenme hatası:', e.message);
+  }
+  
+  // Daha fazla etkileşim dene
+  try { 
+    console.log('Mouse click yapılıyor...');
+    await page.mouse.click(640, 360, { clickCount: 1 }); 
+    await sleep(1000);
+    await page.mouse.click(300, 300, { clickCount: 1 }); 
+    console.log('Mouse click tamamlandı');
+  } catch (e) {
+    console.error('Mouse click hatası:', e.message);
+  }
+  
   try {
     await page.evaluate(() => {
-      const tryPlay = () => { const v = document.querySelector("video"); if (v) v.play().catch(() => {}); };
-      tryPlay(); setTimeout(tryPlay, 800); setTimeout(tryPlay, 2000);
+      const tryPlay = () => { 
+        const v = document.querySelector("video"); 
+        if (v) {
+          v.muted = true;
+          v.play().catch(() => {});
+        }
+        // Play butonlarını da dene
+        const playBtns = document.querySelectorAll('button, .play-btn, [class*="play"]');
+        playBtns.forEach(btn => {
+          try { btn.click(); } catch {}
+        });
+      };
+      tryPlay(); 
+      setTimeout(tryPlay, 1000); 
+      setTimeout(tryPlay, 3000);
+      setTimeout(tryPlay, 5000);
     });
   } catch {}
 
+  console.log('M3u8 bekleniyor... (3 dakika)');
   await Promise.race([hitPromise, sleep(LISTEN_MS)]);
-  if (!strongHit && lastAny) console.log(lastAny);
-  else if (!strongHit) console.error("❌ m3u8 yakalanamadı");
+  
+  if (!strongHit && lastAny) {
+    console.log('⚠️ Yayin m3u8 bulunamadı ama genel m3u8 bulundu:', lastAny);
+  } else if (!strongHit) {
+    console.error("❌ m3u8 yakalanamadı");
+    console.log('Son deneme: sayfa yenileme ve tekrar deneme');
+    try {
+      await page.reload({ waitUntil: 'domcontentloaded', timeout: 15000 });
+      await sleep(5000);
+      await page.evaluate(() => {
+        const v = document.querySelector("video");
+        if (v) { v.muted = true; v.play().catch(() => {}); }
+      });
+      await sleep(10000); // 10 saniye daha bekle
+    } catch {}
+  }
 
   // --- MAÇ LİSTESİ (HTTP → Puppeteer fallback) ---
   await collectMatches(activeDomain, page);

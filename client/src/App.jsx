@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import Hls from "hls.js";
 
 const getServerUrl = () => {
-  const url = process.env.REACT_APP_SERVER_URL || "https://caneryilmazsports-backend.onrender.com";
+  const url = import.meta.env.VITE_SERVER_URL || "http://localhost:5001";
   console.log('Server URL:', url);
   return url;
 };

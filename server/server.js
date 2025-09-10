@@ -11,6 +11,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+app.get("/health", (req, res) => res.status(200).send("ok"));
+
 app.use(cors({
   origin: ['https://caneryilmazsports.vercel.app', 'http://localhost:5173', 'http://localhost:3000'],
   credentials: true,
@@ -56,7 +58,7 @@ function runHelperOnce() {
 runHelperOnce();
 
 // 5 dakikada bir tekrar tetikle (ihtiyaca göre 2–10 dk yapabilirsin)
-helperTimer = setInterval(runHelperOnce, 5 * 60 * 1000);
+helperTimer = setInterval(runHelperOnce, 12 * 60 * 1000);
 
 // İsteğe bağlı: manuel tetikleme
 app.post("/api/refresh", (req, res) => {

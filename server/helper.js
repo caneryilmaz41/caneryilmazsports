@@ -6,8 +6,8 @@ import fetch from "node-fetch";
 import path from "path";
 import https from "https";
 
-const LISTEN_MS = 120000;        // m3u8 dinleme süresi (2 dakika)
-const NAV_TIMEOUT = 30000;       // sayfa timeout (30 saniye)
+ const LISTEN_MS = 75000;         // RAM'i üzmeden yeterli dinleme
+ const NAV_TIMEOUT = 45000;       // bazı anlarda geç açılıyor
 const YAYIN_RE = /\/yayin\d+\.m3u8(\?|$)/i;
 const ANY_M3U8 = /\.m3u8(\?|$)/i;
 
@@ -148,8 +148,8 @@ async function fetchMatchesViaHTTP(activeDomain) {
 async function scrapeMatchesViaPuppeteer(browser, activeDomain) {
   const matchPage = await browser.newPage();
   try {
-    await matchPage.goto(activeDomain, { waitUntil: "domcontentloaded", timeout: 30000 });
-    await matchPage.waitForSelector("#matches-tab a.channel-item", { timeout: 10000 }).catch(() => {});
+    await page.goto(activeDomain + "/", { waitUntil: "domcontentloaded", timeout: 45000 });
+    await page.waitForSelector("#matches-tab a.channel-item, a.channel-item[href*='channel.html?id=']", { timeout: 15000 }).catch(() => {});
     
     // Retry mekanizması ile $$eval
     let rows = [];
@@ -198,6 +198,11 @@ async function scrapeMatchesViaPuppeteer(browser, activeDomain) {
     await matchPage.close();
   }
 }
+function writeJSONAtomic(filePath, data) {
+  const tmp = filePath + ".tmp";
+  fs.writeFileSync(tmp, JSON.stringify(data, null, 2), "utf-8");
+  fs.renameSync(tmp, filePath); // atomik swap
+}
 
 async function collectMatches(activeDomain, browser) {
   let list = await fetchMatchesViaHTTP(activeDomain);
@@ -205,9 +210,14 @@ async function collectMatches(activeDomain, browser) {
     console.log('HTTP ile maç bulunamadı, Puppeteer deneniyor...');
     list = await scrapeMatchesViaPuppeteer(browser, activeDomain);
   }
-  const out = Array.isArray(list) ? list : [];
-  fs.writeFileSync(path.join(process.cwd(), "matches.json"), JSON.stringify(out, null, 2), "utf-8");
-  console.log(`✅ matches.json yazıldı — ${out.length} kayıt`);
+const out = Array.isArray(list) ? list : [];
+ const outPath = path.join(process.cwd(), "matches.json");
+ if (out.length > 0) {
+   writeJSONAtomic(outPath, out);
+   console.log(`✅ matches.json yazıldı — ${out.length} kayıt`);
+ } else {
+   console.warn("⚠️ matches.json güncellenmedi (0 kayıt). Eski liste korunuyor.");
+ }
 }
 
 /* ---------- m3u8 yakala ve streams.json üret ---------- */

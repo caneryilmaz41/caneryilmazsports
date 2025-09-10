@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Hls from "hls.js";
+// API kökü: Vercel'de env'den, localde localhost
+const API = import.meta.env.VITE_API_BASE || "http://localhost:5001";
 
 const getServerUrl = () => {
   const url = import.meta.env.VITE_SERVER_URL || "http://localhost:5001";
@@ -56,14 +58,14 @@ export default function App() {
   
 
   useEffect(() => {
-    fetch(getServerUrl()+"/api/channels")
+    fetch(`${API}/api/channels`)
       .then((res) => res.json())
       .then((data) => setChannels(Array.isArray(data) ? data : Object.keys(data || {})))
       .catch(() => setChannels(["BeIN Sports 1", "BeIN Sports 2", "BeIN Sports 3", "BeIN Sports 4"]));
   }, []);
 
   useEffect(() => {
-    fetch(getServerUrl()+"/api/matches")
+    + fetch(`${API}/api/matches`)
       .then((r) => r.json())
       .then((d) => setMatches(Array.isArray(d) ? d : []))
       .catch(() => setMatches([]));
@@ -123,12 +125,12 @@ export default function App() {
   };
 
   const playChannel = (channelName) => {
-    const streamUrl = `${getServerUrl()}/api/stream/${encodeURIComponent(channelName)}`;
+     const streamUrl = `${API}/api/stream/${encodeURIComponent(channelName)}`;
     commonPlay(streamUrl, channelName);
   };
 
   const playByMatchId = (id, fallbackTitle = null) => {
-    const streamUrl = `${getServerUrl()}/api/stream-id/${encodeURIComponent(id)}`;
+    const streamUrl = `${API}/api/stream-id/${encodeURIComponent(id)}`;
     commonPlay(streamUrl, fallbackTitle || id);
   };
 

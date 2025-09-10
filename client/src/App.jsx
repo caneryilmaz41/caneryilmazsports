@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Hls from "hls.js";
 // API kökü: Vercel'de env'den, localde localhost
 const API = import.meta.env.VITE_API_BASE || "http://localhost:5001";
@@ -65,7 +65,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    + fetch(`${API}/api/matches`)
+     fetch(`${API}/api/matches`)
       .then((r) => r.json())
       .then((d) => setMatches(Array.isArray(d) ? d : []))
       .catch(() => setMatches([]));
@@ -75,64 +75,53 @@ export default function App() {
     try { video.pause(); } catch {}
     try { video.removeAttribute("src"); video.load(); } catch {}
   };
+const videoRef = useRef(null);
+const hlsRef = useRef(null);
+const commonPlay = async (playUrl, label = "") => {
+  try {
+    const video = videoRef.current;
+    if (!video) return;
 
-  const commonPlay = (streamUrl, labelForUI = null) => {
-    const video = document.getElementById("video");
-
-    if (hlsInstance) {
-      try { hlsInstance.stopLoad(); hlsInstance.detachMedia(); hlsInstance.destroy(); } catch {}
-      setHlsInstance(null);
+    // önceki hls instance'ını kapat
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
     }
-    safeResetVideo(video);
-    setIsPlaying(false);
 
     if (Hls.isSupported()) {
-      const hls = new Hls();
-      hls.loadSource(streamUrl);
+      const hls = new Hls({ enableWorker: true });
+      hlsRef.current = hls;
+      hls.loadSource(playUrl);
       hls.attachMedia(video);
-      hls.on(Hls.Events.MANIFEST_PARSED, async () => {
-        try { await video.play(); setIsPlaying(true); }
-        catch { try { video.muted = true; await video.play(); setIsPlaying(true); } catch {} }
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        video.play().catch(() => {});
       });
-      setHlsInstance(hls);
     } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      video.src = streamUrl;
-      video.addEventListener("loadedmetadata", async () => {
-        try { await video.play(); setIsPlaying(true); } catch {}
-      }, { once: true });
+      video.src = playUrl;
+      await video.play().catch(() => {});
     }
 
-    if (labelForUI) setActiveChannel(labelForUI);
-    
-    // Video event listeners
-    setTimeout(() => {
-      const video = document.getElementById('video');
-      if (video) {
-        video.addEventListener('play', () => {
-          setVideoPaused(false);
-          showControlsTemporarily();
-        });
-        video.addEventListener('pause', () => {
-          setVideoPaused(true);
-          setShowControls(true); // Durdurulduğunda kontrolleri göster
-        });
-        video.addEventListener('volumechange', () => {
-          setVideoMuted(video.muted);
-        });
+    setActiveChannel(label);+   setIsPlaying(true);
+  } catch (e) {
+    console.error("play error:", e);
+  }
+};
 
-      }
-    }, 100);
-  };
+const playChannel = async (channelName) => {
+  const res = await fetch(`${API}/api/stream/${encodeURIComponent(channelName)}`);
+  const data = await res.json();
+  if (!data?.url) return console.warn("stream url yok");
+  commonPlay(data.url, channelName);
+};
 
-  const playChannel = (channelName) => {
-     const streamUrl = `${API}/api/stream/${encodeURIComponent(channelName)}`;
-    commonPlay(streamUrl, channelName);
-  };
 
-  const playByMatchId = (id, fallbackTitle = null) => {
-    const streamUrl = `${API}/api/stream-id/${encodeURIComponent(id)}`;
-    commonPlay(streamUrl, fallbackTitle || id);
-  };
+  const playByMatchId = async (id, fallbackTitle = null) => {
+  const res = await fetch(`${API}/api/stream-id/${encodeURIComponent(id)}`);
+  const data = await res.json();
+  if (!data?.url) return console.warn("stream url yok");
+  commonPlay(data.url, fallbackTitle || id);
+};
+
 
   // Kontrol gösterme/gizleme
   const showControlsTemporarily = () => {
@@ -259,7 +248,7 @@ export default function App() {
             {/* 16:9 alan */}
             <div style={{ paddingTop: "56.25%" }} />
 
-            <video
+            <video  ref={videoRef}
               id="video"
               className="absolute inset-0 h-full w-full z-10"
               poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1920 1080'%3E%3Crect width='1920' height='1080' fill='%23000000'/%3E%3C/svg%3E"
@@ -606,7 +595,7 @@ export default function App() {
         <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-center text-xs text-white/60">
           © {new Date().getFullYear()} — Yayın arayüzü • hafif ve hızlı.
         </div>
-      </footer>x  
+      </footer>
     </div>
   );
 }

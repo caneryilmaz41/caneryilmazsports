@@ -6,16 +6,26 @@ import fetch from "node-fetch";
 import path from "path";
 import https from "https";
 
- const LISTEN_MS = 75000;         // RAM'i üzmeden yeterli dinleme
- const NAV_TIMEOUT = 45000;       // bazı anlarda geç açılıyor
+const LISTEN_MS = 75000;   // m3u8 dinleme penceresi
+const NAV_TIMEOUT = 45000; // sayfa yükleme toleransı
+
 const YAYIN_RE = /\/yayin\d+\.m3u8(\?|$)/i;
 const ANY_M3U8 = /\.m3u8(\?|$)/i;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const F = (p) => path.join(process.cwd(), "server", p); // TÜM JSON'LAR server/ ALTINDA
 
+function writeJSONAtomic(absPath, data) {
+  const tmp = absPath + ".tmp";
+  fs.writeFileSync(tmp, JSON.stringify(data, null, 2), "utf-8");
+  fs.renameSync(tmp, absPath);
+}
+
+/* ---------- Chrome yolu ---------- */
 function guessChrome() {
-  if (process.env.CHROME_PATH && fs.existsSync(process.env.CHROME_PATH))
+  if (process.env.CHROME_PATH && fs.existsSync(process.env.CHROME_PATH)) {
     return process.env.CHROME_PATH;
+  }
   const plat = os.platform();
   const candidates =
     plat === "darwin"
@@ -26,10 +36,11 @@ function guessChrome() {
           `${process.env["PROGRAMFILES(X86)"]}\\Google\\Chrome\\Application\\chrome.exe`,
           `${process.env["LOCALAPPDATA"]}\\Google\\Chrome\\Application\\chrome.exe`,
         ]
-      : ["/usr/bin/google-chrome-stable", "/usr/bin/google-chrome", "/usr/bin/chromium", "/snap/bin/chromium"];
+      : ["/usr/bin/chromium", "/usr/bin/google-chrome-stable", "/usr/bin/google-chrome", "/snap/bin/chromium"];
   return candidates.find((p) => p && fs.existsSync(p));
 }
 
+/* ---------- Hızlı domain probe ---------- */
 async function quickProbe(url) {
   const agent = new https.Agent({ rejectUnauthorized: false });
   try {
@@ -64,6 +75,7 @@ async function quickProbe(url) {
   }
 }
 
+/* ---------- Aktif domain bul ve server/domain.json'a yaz ---------- */
 async function findActiveDomain(start = 1380, end = 1410) {
   const base = "https://trgoals";
   const tld = ".xyz";
@@ -74,7 +86,7 @@ async function findActiveDomain(start = 1380, end = 1410) {
       const ok = await quickProbe(url);
       if (ok) {
         console.log("✅ Aktif domain:", url);
-        fs.writeFileSync("domain.json", JSON.stringify({ domain: url }, null, 2));
+        writeJSONAtomic(F("domain.json"), { active: url }); // <-- { active } ve server/ içine
         return url;
       }
     } catch (err) {
@@ -84,7 +96,7 @@ async function findActiveDomain(start = 1380, end = 1410) {
   throw new Error("❌ Aktif domain bulunamadı");
 }
 
-/* ---------- MAÇ LİSTESİ: önce HTTP, boşsa Puppeteer ---------- */
+/* ---------- HTTP ile maç listesi ---------- */
 async function fetchMatchesViaHTTP(activeDomain) {
   try {
     const res = await fetch(activeDomain, {
@@ -145,88 +157,57 @@ async function fetchMatchesViaHTTP(activeDomain) {
   }
 }
 
-async function scrapeMatchesViaPuppeteer(browser, activeDomain) {
-  const matchPage = await browser.newPage();
+/* ---------- Puppeteer ile maç listesi ---------- */
+export async function scrapeMatchesViaPuppeteer(activeDomain, browser) {
+  const page = await browser.newPage();
   try {
-    await page.goto(activeDomain + "/", { waitUntil: "domcontentloaded", timeout: 45000 });
-    await page.waitForSelector("#matches-tab a.channel-item, a.channel-item[href*='channel.html?id=']", { timeout: 15000 }).catch(() => {});
-    
-    // Retry mekanizması ile $$eval
-    let rows = [];
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        rows = await matchPage.$$eval("#matches-tab a.channel-item", (as) =>
-          as.map((a) => {
-            const name = a.querySelector(".channel-name")?.textContent?.trim() || "";
-            const time = a.querySelector(".channel-status")?.textContent?.trim() || "";
-            const href = a.getAttribute("href") || "";
-            const id = (() => {
-              try {
-                const u = new URL(href, location.origin);
-                return u.searchParams.get("id");
-              } catch {
-                const m = href.match(/id=([^&]+)/);
-                return m ? m[1] : null;
-              }
-            })();
-            return { title: name, time: time || null, id: id || null, href: href || null };
-          })
-        );
-        break; // Başarılı olursa döngüden çık
-      } catch (e) {
-        console.log(`$$eval deneme ${attempt + 1} başarısız:`, e.message);
-        if (attempt < 2) {
-          await sleep(2000); // 2 saniye bekle ve tekrar dene
-        }
-      }
-    }
-    
-    const seen = new Set();
-    const filtered = rows.filter((r) => {
-      if (!r.title) return false;
-      const k = [r.time, r.title, r.id].filter(Boolean).join("|").toLowerCase();
-      if (seen.has(k)) return false;
-      seen.add(k);
-      return true;
+    await page.setDefaultNavigationTimeout(NAV_TIMEOUT);
+    await page.goto(activeDomain + "/", { waitUntil: "domcontentloaded" });
+
+    await page.waitForSelector(
+      "#matches-tab a.channel-item, a.channel-item[href*='channel.html?id=']",
+      { timeout: 15000 }
+    ).catch(() => {});
+    try { await page.evaluate(() => document.querySelector('[data-tab="matches"]')?.click()); } catch {}
+
+    const list = await page.evaluate(() => {
+      const items = Array.from(document.querySelectorAll("a.channel-item"));
+      return items.map((a) => ({
+        id: (new URL(a.href, location.href)).searchParams.get("id"),
+        title: a.textContent?.trim() || "",
+      })).filter(x => x.id);
     });
-    
-    return filtered;
-  } catch (e) {
-    console.log("Puppeteer match scrape hata:", e.message);
-    return null;
+
+    return Array.isArray(list) ? list : [];
   } finally {
-    await matchPage.close();
+    await page.close();
   }
 }
-function writeJSONAtomic(filePath, data) {
-  const tmp = filePath + ".tmp";
-  fs.writeFileSync(tmp, JSON.stringify(data, null, 2), "utf-8");
-  fs.renameSync(tmp, filePath); // atomik swap
-}
 
+/* ---------- Maçları topla ve server/matches.json'a yaz ---------- */
 async function collectMatches(activeDomain, browser) {
   let list = await fetchMatchesViaHTTP(activeDomain);
   if (!list || list.length === 0) {
-    console.log('HTTP ile maç bulunamadı, Puppeteer deneniyor...');
-    list = await scrapeMatchesViaPuppeteer(browser, activeDomain);
+    console.log("HTTP ile maç bulunamadı, Puppeteer deneniyor...");
+    // DİKKAT: Parametre sırası (activeDomain, browser)
+    list = await scrapeMatchesViaPuppeteer(activeDomain, browser);
   }
-const out = Array.isArray(list) ? list : [];
- const outPath = path.join(process.cwd(), "matches.json");
- if (out.length > 0) {
-   writeJSONAtomic(outPath, out);
-   console.log(`✅ matches.json yazıldı — ${out.length} kayıt`);
- } else {
-   console.warn("⚠️ matches.json güncellenmedi (0 kayıt). Eski liste korunuyor.");
- }
+  const out = Array.isArray(list) ? list : [];
+  const outPath = F("matches.json");
+  if (out.length > 0) {
+    writeJSONAtomic(outPath, out);
+    console.log(`✅ matches.json yazıldı — ${out.length} kayıt`);
+  } else {
+    console.warn("⚠️ matches.json güncellenmedi (0 kayıt). Eski liste korunuyor.");
+  }
 }
 
-/* ---------- m3u8 yakala ve streams.json üret ---------- */
+/* ---------- Ana akış: m3u8 yakala + streams.json üret + maçları yaz ---------- */
 (async () => {
   const chromePath = guessChrome();
-  console.log('Chrome path:', chromePath);
+  console.log("Chrome path:", chromePath || "(bulunamadı)");
   if (!chromePath) {
     console.error("❌ Chrome/Chromium bulunamadı. CHROME_PATH ile yol ver.");
-    console.log('Available paths checked:', ["/usr/bin/google-chrome-stable", "/usr/bin/google-chrome", "/usr/bin/chromium"]);
     process.exit(2);
   }
 
@@ -242,12 +223,8 @@ const out = Array.isArray(list) ? list : [];
       "--disable-setuid-sandbox",
       "--disable-dev-shm-usage",
       "--disable-gpu",
-      "--disable-web-security",
-      "--disable-features=VizDisplayCompositor",
-      "--disable-images", // Resim yüklemeyi devre dışı bırak
-      "--disable-javascript", // JS'i devre dışı bırak (sadece network dinliyoruz)
-      "--disable-plugins",
-      "--disable-extensions",
+      // "--disable-images", // istersen açık bırak (siteye göre değişebilir)
+      // JS'i KAPATMAYALIM; ağ isteklerini tetikleyen kodlar gerekebilir
       "--autoplay-policy=no-user-gesture-required",
       "--mute-audio",
     ],
@@ -265,19 +242,17 @@ const out = Array.isArray(list) ? list : [];
 
   let strongHit = null;
   let lastAny = null;
-  let resolveHit;
-  const hitPromise = new Promise((r) => (resolveHit = r));
 
   const consider = (url) => {
     if (!url) return;
-    // Sadece m3u8 URL'lerini log'la, gereksiz trafiği azalt
-    if (url.includes('.m3u8')) {
-      console.log('M3U8 URL kontrol ediliyor:', url);
+    if (url.includes(".m3u8")) {
+      console.log("M3U8 URL kontrol ediliyor:", url);
     }
     if (YAYIN_RE.test(url)) {
       strongHit = url;
       console.log("✅ m3u8 bulundu:", url);
 
+      // Tüm kanallar için base'den üret ve server/streams.json'a yaz
       const baseUrl = url.split(/yayin\d+\.m3u8/i)[0];
       const channels = {
         "BeIN Sports 1": "yayin1.m3u8",
@@ -305,54 +280,54 @@ const out = Array.isArray(list) ? list : [];
       };
 
       const streams = {};
-      for (const [name, pathUrl] of Object.entries(channels)) {
-        const fullUrl = new URL(pathUrl, baseUrl).href;
-        streams[name] = fullUrl;
+      for (const [name, rel] of Object.entries(channels)) {
+        streams[name] = new URL(rel, baseUrl).href;
       }
-      fs.writeFileSync(path.join(process.cwd(), "streams.json"), JSON.stringify(streams, null, 2));
-      resolveHit();
+      writeJSONAtomic(F("streams.json"), streams); // <-- server/streams.json
     } else if (ANY_M3U8.test(url)) {
       lastAny = url;
     }
   };
 
-  // Sadece m3u8 içeren istekleri dinle
+  // Yalnızca m3u8 içeren istekleri dinle
   cdp.on("Network.requestWillBeSent", (e) => {
     const url = e?.request?.url;
-    if (url && url.includes('.m3u8')) consider(url);
+    if (url && url.includes(".m3u8")) consider(url);
   });
   cdp.on("Network.responseReceived", (e) => {
     const url = e?.response?.url;
-    if (url && url.includes('.m3u8')) consider(url);
+    if (url && url.includes(".m3u8")) consider(url);
   });
   page.on("request", (req) => {
     const url = req.url();
-    if (url && url.includes('.m3u8')) consider(url);
+    if (url && url.includes(".m3u8")) consider(url);
   });
   page.on("response", (res) => {
     const url = res.url();
-    if (url && url.includes('.m3u8')) consider(url);
+    if (url && url.includes(".m3u8")) consider(url);
   });
 
-  console.log('Hedef URL:', TARGET);
+  console.log("Hedef URL:", TARGET);
   try {
-    console.log('Sayfaya gidiliyor...');
+    console.log("Sayfaya gidiliyor...");
     await page.goto(TARGET, { waitUntil: "domcontentloaded", timeout: NAV_TIMEOUT });
-    console.log('Sayfa yüklendi, m3u8 bekleniyor...');
+    console.log("Sayfa yüklendi, m3u8 bekleniyor...");
   } catch (e) {
-    console.log('Sayfa yüklenme hatası:', e.message);
+    console.log("Sayfa yüklenme hatası:", e.message);
   }
 
-  console.log('M3u8 bekleniyor... (2 dakika)');
-  await Promise.race([hitPromise, sleep(LISTEN_MS)]);
-  
+  console.log("M3u8 bekleniyor... (2 dakika)");
+  await Promise.race([sleep(LISTEN_MS), (async () => {
+    while (!strongHit) await sleep(250);
+  })()]);
+
   if (!strongHit && lastAny) {
-    console.log('⚠️ Yayin m3u8 bulunamadı ama genel m3u8 bulundu:', lastAny);
+    console.log("⚠️ Yayin m3u8 bulunamadı ama genel m3u8 bulundu:", lastAny);
   } else if (!strongHit) {
     console.error("❌ m3u8 yakalanamadı");
   }
 
-  // --- MAÇ LİSTESİ (HTTP → Puppeteer fallback) ---
+  // Maç listesi
   await collectMatches(activeDomain, browser);
 
   try { await cdp.detach(); } catch {}

@@ -1,16 +1,15 @@
 services:
   - type: web
-    name: caneryilmazsports-backend
+    name: cys-backend
     env: docker
-    dockerfilePath: ./Dockerfile
-    plan: starter
+    dockerfilePath: ./server/Dockerfile
+    plan: free
     region: frankfurt
-    branch: main
     envVars:
       - key: PORT
         value: 5001
       - key: NODE_ENV
         value: production
       - key: CHROME_PATH
-        value: /usr/bin/google-chrome-stable
+        value: /usr/bin/chromium
     healthCheckPath: /health

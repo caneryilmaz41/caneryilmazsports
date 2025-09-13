@@ -1,13 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Hls from "hls.js";
-// API kökü: Vercel'de env'den, localde localhost
-const API = import.meta.env.VITE_API_BASE || "http://localhost:5001";
-
-const getServerUrl = () => {
-  const url = import.meta.env.VITE_SERVER_URL || "http://localhost:5001";
-  console.log('Server URL:', url);
-  return url;
-};
 
 /* Hafif, bağımsız ikonlar (kütüphane yok, inline SVG) */
 const IconBall = (props) => (
@@ -55,17 +47,15 @@ export default function App() {
   const [matchQuery, setMatchQuery] = useState("");
   const [channelQuery, setChannelQuery] = useState("");
 
-  
-
   useEffect(() => {
-    fetch(`${API}/api/channels`)
+    fetch("http://localhost:5001/api/channels")
       .then((res) => res.json())
       .then((data) => setChannels(Array.isArray(data) ? data : Object.keys(data || {})))
       .catch(() => setChannels(["BeIN Sports 1", "BeIN Sports 2", "BeIN Sports 3", "BeIN Sports 4"]));
   }, []);
 
   useEffect(() => {
-    + fetch(`${API}/api/matches`)
+    fetch("http://localhost:5001/api/matches")
       .then((r) => r.json())
       .then((d) => setMatches(Array.isArray(d) ? d : []))
       .catch(() => setMatches([]));
@@ -87,7 +77,11 @@ export default function App() {
     setIsPlaying(false);
 
     if (Hls.isSupported()) {
-      const hls = new Hls();
+      const hls = new Hls({
+        xhrSetup: (xhr, url) => {
+          xhr.open("GET", `http://localhost:5001/api/proxy?url=${encodeURIComponent(url)}`);
+        },
+      });
       hls.loadSource(streamUrl);
       hls.attachMedia(video);
       hls.on(Hls.Events.MANIFEST_PARSED, async () => {
@@ -125,12 +119,12 @@ export default function App() {
   };
 
   const playChannel = (channelName) => {
-     const streamUrl = `${API}/api/stream/${encodeURIComponent(channelName)}`;
+    const streamUrl = `http://localhost:5001/api/stream/${encodeURIComponent(channelName)}`;
     commonPlay(streamUrl, channelName);
   };
 
   const playByMatchId = (id, fallbackTitle = null) => {
-    const streamUrl = `${API}/api/stream-id/${encodeURIComponent(id)}`;
+    const streamUrl = `http://localhost:5001/api/stream-id/${encodeURIComponent(id)}`;
     commonPlay(streamUrl, fallbackTitle || id);
   };
 
@@ -604,7 +598,7 @@ export default function App() {
       {/* FOOTER */}
       <footer className="mx-auto max-w-7xl px-4 pb-6 pt-2 md:pt-0">
         <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-center text-xs text-white/60">
-          © {new Date().getFullYear()} — Yayın arayüzü • hafif ve hızlı.
+          © {new Date().getFullYear()} — caneryilmazsports-hd
         </div>
       </footer>x  
     </div>

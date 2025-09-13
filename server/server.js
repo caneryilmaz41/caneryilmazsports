@@ -11,19 +11,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-app.get("/health", (req, res) => res.status(200).send("ok"));
-
-app.use(cors({
-  origin: ['https://caneryilmazsports.vercel.app', 'http://localhost:5173', 'http://localhost:3000'],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
-
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
-});
+app.use(cors());
 
 // --- helper.js otomatik çalıştırma (periyodik) ---
 let helperRunning = false;
@@ -33,19 +21,15 @@ function runHelperOnce() {
   if (helperRunning) return; // aynı anda birden fazla helper çalışmasın
   helperRunning = true;
 
-  console.log('[helper] Başlatılıyor...');
   const child = spawn(process.execPath, ["helper.js"], {
     stdio: "inherit",
     cwd: __dirname, // helper.js server ile aynı klasörde
-    env: { ...process.env, CHROME_PATH: process.env.CHROME_PATH || '/usr/bin/google-chrome-stable' },
+    env: process.env,
   });
 
   child.on("close", (code) => {
     helperRunning = false;
     console.log(`[helper] bitti. exit code: ${code}`);
-    if (code !== 0) {
-      console.error(`[helper] Hata ile kapandı: ${code}`);
-    }
   });
 
   child.on("error", (err) => {
@@ -58,7 +42,7 @@ function runHelperOnce() {
 runHelperOnce();
 
 // 5 dakikada bir tekrar tetikle (ihtiyaca göre 2–10 dk yapabilirsin)
-helperTimer = setInterval(runHelperOnce, 12 * 60 * 1000);
+helperTimer = setInterval(runHelperOnce, 5 * 60 * 1000);
 
 // İsteğe bağlı: manuel tetikleme
 app.post("/api/refresh", (req, res) => {
@@ -89,11 +73,9 @@ function getReferer() {
   try {
     const p = path.join(__dirname, "domain.json");
     const { domain } = JSON.parse(fs.readFileSync(p, "utf-8"));
-    console.log(`[referer] Domain.json'dan okunan: ${domain}`);
-    return domain || "https://trgoals1391.xyz/"; // güncel fallback
+    return domain || "https://trgoals1383.xyz/"; // fallback
   } catch {
-    console.log('[referer] Domain.json okunamadı, fallback kullanılıyor');
-    return "https://trgoals1391.xyz/"; // güncel fallback
+    return "https://trgoals1383.xyz/"; // fallback
   }
 }
 
@@ -121,23 +103,15 @@ app.get("/api/stream/:channel", async (req, res) => {
       return res.status(404).send("Channel not found");
     }
 
-    console.log(`[stream] ${channel} -> ${url}`);
-    const referer = getReferer();
-    console.log(`[stream] Referer: ${referer}`);
-    
     const response = await fetch(url, {
       headers: {
-        Referer: referer,
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        Referer: getReferer(),
+        "User-Agent": "Mozilla/5.0",
         Accept: "*/*",
-        "Accept-Encoding": "identity",
-        "Cache-Control": "no-cache",
       },
-      timeout: 15000,
     });
 
     if (!response.ok) {
-      console.error(`[stream] Upstream error: ${response.status} for ${url}`);
       return res.status(502).send("Upstream error: " + response.status);
     }
 
@@ -145,13 +119,10 @@ app.get("/api/stream/:channel", async (req, res) => {
       "Content-Type",
       response.headers.get("content-type") || "application/vnd.apple.mpegurl"
     );
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Cache-Control", "no-cache");
 
     const body = Buffer.from(await response.arrayBuffer());
     res.send(body);
   } catch (err) {
-    console.error(`[stream] Error: ${err.message}`);
     res.status(500).send("Stream error: " + err.message);
   }
 });
@@ -160,6 +131,7 @@ app.get("/api/stream/:channel", async (req, res) => {
 app.get("/api/proxy", async (req, res) => {
   try {
     const url = req.query.url;
+    
     if (!url || typeof url !== "string") {
       return res.status(400).send("Missing url param");
     }
@@ -231,14 +203,7 @@ app.get("/api/stream-id/:id", async (req, res) => {
     if (!url) return res.status(404).send("Channel stream not found");
 
     const response = await fetch(url, {
-      headers: {
-        Referer: getReferer(),
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        Accept: "*/*",
-        "Accept-Encoding": "identity",
-        "Cache-Control": "no-cache",
-      },
-      timeout: 15000,
+      headers: { Referer: getReferer(), "User-Agent": "Mozilla/5.0", Accept: "*/*" },
     });
     if (!response.ok) return res.status(502).send("Upstream error: " + response.status);
 

@@ -1,4 +1,4 @@
-/* eslint-disable no-console */
+// server.js
 import express from "express";
 import cors from "cors";
 import fetch from "node-fetch";
@@ -11,8 +11,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+app.get("/health", (req, res) => res.status(200).send("ok"));
 
-// ---------- CORS ----------
 app.use(cors({
   origin: ['https://caneryilmazsports.vercel.app', 'http://localhost:5173', 'http://localhost:3000'],
   credentials: true,
@@ -20,27 +20,32 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// ---------- Health ----------
-app.get("/health", (req, res) => res.status(200).send("ok"));
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
 
-// ---------- helper.js otomatik çalıştırma ----------
+// --- helper.js otomatik çalıştırma (periyodik) ---
 let helperRunning = false;
 let helperTimer = null;
 
 function runHelperOnce() {
-  if (helperRunning) return;
+  if (helperRunning) return; // aynı anda birden fazla helper çalışmasın
   helperRunning = true;
 
   console.log('[helper] Başlatılıyor...');
   const child = spawn(process.execPath, ["helper.js"], {
     stdio: "inherit",
-    cwd: __dirname,
+    cwd: __dirname, // helper.js server ile aynı klasörde
     env: { ...process.env, CHROME_PATH: process.env.CHROME_PATH || '/usr/bin/google-chrome-stable' },
   });
 
   child.on("close", (code) => {
     helperRunning = false;
     console.log(`[helper] bitti. exit code: ${code}`);
+    if (code !== 0) {
+      console.error(`[helper] Hata ile kapandı: ${code}`);
+    }
   });
 
   child.on("error", (err) => {
@@ -49,15 +54,19 @@ function runHelperOnce() {
   });
 }
 
+// Server ayağa kalkınca bir kez helper çalıştır
 runHelperOnce();
+
+// 5 dakikada bir tekrar tetikle (ihtiyaca göre 2–10 dk yapabilirsin)
 helperTimer = setInterval(runHelperOnce, 12 * 60 * 1000);
 
+// İsteğe bağlı: manuel tetikleme
 app.post("/api/refresh", (req, res) => {
   runHelperOnce();
   res.json({ ok: true });
 });
 
-// ---------- JSON Yükleyiciler ----------
+// --- yardımcı okuyucular ---
 function loadStreams() {
   try {
     const p = path.join(__dirname, "streams.json");
@@ -81,40 +90,109 @@ function getReferer() {
     const p = path.join(__dirname, "domain.json");
     const { domain } = JSON.parse(fs.readFileSync(p, "utf-8"));
     console.log(`[referer] Domain.json'dan okunan: ${domain}`);
-    return domain || "https://trgoals1391.xyz/";
+    return domain || "https://trgoals1391.xyz/"; // güncel fallback
   } catch {
     console.log('[referer] Domain.json okunamadı, fallback kullanılıyor');
-    return "https://trgoals1391.xyz/";
+    return "https://trgoals1391.xyz/"; // güncel fallback
   }
 }
 
-// ---------- API: Kanal listesi ----------
+// --- API: kanal listesi ---
 app.get("/api/channels", (req, res) => {
   const streams = loadStreams();
-  res.json(streams); // artık map dönüyor
+  res.json(Object.keys(streams)); // Frontend basit dizi bekliyorsa
+  // tüm map istenirse: res.json(streams);
 });
 
-// ---------- API: Maç listesi ----------
+// --- API: maç listesi ---
 app.get("/api/matches", (req, res) => {
   const matches = loadMatches();
   res.json(matches);
 });
 
-// ---------- API: Kanal ismine göre stream ----------
-app.get("/api/stream/:channel", (req, res) => {
-  const channel = decodeURIComponent(req.params.channel || "");
-  const streams = loadStreams();
-  const url = streams[channel];
-  if (!url) return res.status(404).send("Channel not found");
+// --- API: master m3u8 proxy (/api/stream/:channel) ---
+app.get("/api/stream/:channel", async (req, res) => {
+  try {
+    const channel = decodeURIComponent(req.params.channel || "");
+    const streams = loadStreams();
+    const url = streams[channel];
 
-  const proxied = `/api/hls?u=${encodeURIComponent(url)}`;
-  res.json({ channel, url: proxied });
+    if (!url) {
+      return res.status(404).send("Channel not found");
+    }
+
+    console.log(`[stream] ${channel} -> ${url}`);
+    const referer = getReferer();
+    console.log(`[stream] Referer: ${referer}`);
+    
+    const response = await fetch(url, {
+      headers: {
+        Referer: referer,
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        Accept: "*/*",
+        "Accept-Encoding": "identity",
+        "Cache-Control": "no-cache",
+      },
+      timeout: 15000,
+    });
+
+    if (!response.ok) {
+      console.error(`[stream] Upstream error: ${response.status} for ${url}`);
+      return res.status(502).send("Upstream error: " + response.status);
+    }
+
+    res.setHeader(
+      "Content-Type",
+      response.headers.get("content-type") || "application/vnd.apple.mpegurl"
+    );
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Cache-Control", "no-cache");
+
+    const body = Buffer.from(await response.arrayBuffer());
+    res.send(body);
+  } catch (err) {
+    console.error(`[stream] Error: ${err.message}`);
+    res.status(500).send("Stream error: " + err.message);
+  }
 });
 
-// ---------- API: id → stream ----------
+// --- API: segment/alt manifest proxy (/api/proxy?url=...) ---
+app.get("/api/proxy", async (req, res) => {
+  try {
+    const url = req.query.url;
+    if (!url || typeof url !== "string") {
+      return res.status(400).send("Missing url param");
+    }
+
+    const response = await fetch(url, {
+      headers: {
+        Referer: getReferer(),
+        "User-Agent": "Mozilla/5.0",
+        Accept: "*/*",
+      },
+    });
+
+    if (!response.ok) {
+      return res.status(502).send("Upstream error: " + response.status);
+    }
+
+    res.setHeader(
+      "Content-Type",
+      response.headers.get("content-type") || "application/octet-stream"
+    );
+
+    const body = Buffer.from(await response.arrayBuffer());
+    res.send(body);
+  } catch (err) {
+    res.status(500).send("Proxy error: " + err.message);
+  }
+});
+
+// --- id → kanal adı eşlemesi + id ile stream endpoint ---
 function channelNameFromId(id) {
   if (!id) return null;
   const m = String(id).toLowerCase();
+
   const mapExact = {
     "yayin1": "BeIN Sports 1",
     "yayinb2": "BeIN Sports 2",
@@ -139,76 +217,46 @@ function channelNameFromId(id) {
     "yayineu1": "Euro Sport 1",
     "yayineu2": "Euro Sport 2",
   };
+
   return mapExact[m] || null;
 }
 
-app.get("/api/stream-id/:id", (req, res) => {
-  const id = decodeURIComponent(req.params.id || "");
-  const name = channelNameFromId(id);
-  if (!name) return res.status(404).send("Unknown id");
-  const streams = loadStreams();
-  const url = streams[name];
-  if (!url) return res.status(404).send("Channel stream not found");
-
-  const proxied = `/api/hls?u=${encodeURIComponent(url)}`;
-  res.json({ id, name, url: proxied });
-});
-
-// ---------- API: HLS Proxy ----------
-app.get("/api/hls", async (req, res) => {
+app.get("/api/stream-id/:id", async (req, res) => {
   try {
-    const target = req.query.u;
-    if (!target || typeof target !== "string") {
-      return res.status(400).send("Missing u param");
-    }
+    const id = decodeURIComponent(req.params.id || "");
+    const name = channelNameFromId(id);
+    if (!name) return res.status(404).send("Unknown id");
+    const streams = loadStreams();
+    const url = streams[name];
+    if (!url) return res.status(404).send("Channel stream not found");
 
-    const referer = getReferer();
-    const r = await fetch(target, {
+    const response = await fetch(url, {
       headers: {
-        Referer: referer,
-        "User-Agent": "Mozilla/5.0",
+        Referer: getReferer(),
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         Accept: "*/*",
+        "Accept-Encoding": "identity",
+        "Cache-Control": "no-cache",
       },
+      timeout: 15000,
     });
+    if (!response.ok) return res.status(502).send("Upstream error: " + response.status);
 
-    if (!r.ok) {
-      const txt = await r.text().catch(() => "");
-      return res.status(r.status).send(txt || "Upstream error");
-    }
-
-    const ct = r.headers.get("content-type") || "";
-    const isPlaylist = ct.includes("mpegurl") || target.includes(".m3u8");
-
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Cache-Control", "no-cache");
-
-    if (isPlaylist) {
-      const text = await r.text();
-      const base = new URL(target);
-      const baseUrl = base.origin + base.pathname.substring(0, base.pathname.lastIndexOf("/") + 1);
-      const rewritten = text.split("\n").map(line => {
-        const l = line.trim();
-        if (!l || l.startsWith("#")) return line;
-        const abs = new URL(l, baseUrl).href;
-        return `/api/hls?u=${encodeURIComponent(abs)}`;
-      }).join("\n");
-
-      res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
-      return res.send(rewritten);
-    } else {
-      if (ct) res.setHeader("Content-Type", ct);
-      return r.body.pipe(res);
-    }
+    res.setHeader(
+      "Content-Type",
+      response.headers.get("content-type") || "application/vnd.apple.mpegurl"
+    );
+    const body = Buffer.from(await response.arrayBuffer());
+    res.send(body);
   } catch (err) {
-    console.error("hls proxy error:", err);
-    res.status(500).send("hls proxy error");
+    res.status(500).send("Stream error: " + err.message);
   }
 });
 
-// ---------- Shutdown ----------
+// Graceful shutdown (opsiyonel)
 process.on("SIGINT", () => {
   if (helperTimer) clearInterval(helperTimer);
-  console.log("Kapanıyor...");
+  console.log("\nKapanıyor...");
   process.exit(0);
 });
 

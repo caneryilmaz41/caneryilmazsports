@@ -144,9 +144,29 @@ export default function App() {
     }
   };
 
+const testStream = async (channelName) => {
+  try {
+    console.log('[CLIENT] Testing stream for:', channelName);
+    const res = await fetch(`${API}/api/test-stream/${encodeURIComponent(channelName)}?t=${Date.now()}`, { cache: "no-store" });
+    const data = await res.json();
+    console.log('[CLIENT] Stream test result:', data);
+    return data;
+  } catch (error) {
+    console.error('[CLIENT] Stream test error:', error);
+    return null;
+  }
+};
+
 const playChannel = async (channelName) => {
   try {
     console.log('[CLIENT] Requesting channel:', channelName);
+    
+    // Önce stream'i test et
+    const testResult = await testStream(channelName);
+    if (testResult && testResult.status !== 200) {
+      console.warn('[CLIENT] Stream test failed:', testResult);
+    }
+    
     console.log('[CLIENT] API URL:', `${API}/api/stream/${encodeURIComponent(channelName)}?t=${Date.now()}`);
     const res = await fetch(`${API}/api/stream/${encodeURIComponent(channelName)}?t=${Date.now()}`, { cache: "no-store" });
     console.log('[CLIENT] Response status:', res.status);

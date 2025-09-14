@@ -165,6 +165,45 @@ app.get("/api/stream-id/:id", noCache, (req, res) => {
   res.json({ id, name, url: proxied });
 });
 
+// ---------- API: Test Stream URL ----------
+app.get("/api/test-stream/:channel", noCache, async (req, res) => {
+  try {
+    const channel = decodeURIComponent(req.params.channel || "");
+    console.log('[TEST] Testing stream for channel:', channel);
+    const streams = loadStreams();
+    const url = streams[channel];
+    if (!url) {
+      console.log('[TEST] Channel not found:', channel);
+      return res.status(404).json({ error: "Channel not found", available: Object.keys(streams) });
+    }
+    
+    console.log('[TEST] Testing URL:', url);
+    const referer = getReferer();
+    const testRes = await fetch(url, {
+      method: 'HEAD',
+      headers: {
+        Referer: referer,
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      },
+    });
+    
+    console.log('[TEST] Response status:', testRes.status, testRes.statusText);
+    console.log('[TEST] Response headers:', Object.fromEntries(testRes.headers.entries()));
+    
+    res.json({
+      channel,
+      url,
+      status: testRes.status,
+      statusText: testRes.statusText,
+      headers: Object.fromEntries(testRes.headers.entries()),
+      referer
+    });
+  } catch (error) {
+    console.error('[TEST] Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ---------- API: HLS Proxy ----------
 app.get("/api/hls", async (req, res) => {
   try {
@@ -173,6 +212,12 @@ app.get("/api/hls", async (req, res) => {
     if (!target || typeof target !== "string") {
       console.log('[HLS] Missing u param');
       return res.status(400).send("Missing u param");
+    }
+
+    // Sadece .m3u8 ve .ts dosyalarına izin ver
+    if (!target.includes('.m3u8') && !target.includes('.ts')) {
+      console.log('[HLS] Blocked non-stream file:', target);
+      return res.status(404).send('Not found');
     }
 
     const referer = getReferer();
@@ -189,6 +234,7 @@ app.get("/api/hls", async (req, res) => {
 
     if (!r.ok) {
       const txt = await r.text().catch(() => "");
+      console.error('[HLS] Upstream error:', r.status, r.statusText, 'URL:', target);
       return res.status(r.status).send(txt || "Upstream error");
     }
 
@@ -205,6 +251,11 @@ app.get("/api/hls", async (req, res) => {
       const rewritten = text.split("\n").map(line => {
         const l = line.trim();
         if (!l || l.startsWith("#")) return line;
+        // Sadece .ts ve .m3u8 dosyalarını proxy'le
+        if (!l.includes('.ts') && !l.includes('.m3u8')) {
+          console.log('[HLS] Skipping non-stream segment:', l);
+          return line; // Orijinal satırı döndür, proxy'leme
+        }
         const abs = new URL(l, baseUrl).href;
         return `/api/hls?u=${encodeURIComponent(abs)}`;
       }).join("\n");

@@ -204,6 +204,18 @@ app.get("/api/test-stream/:channel", noCache, async (req, res) => {
   }
 });
 
+// ---------- API: Refresh streams ----------
+app.post("/api/refresh-streams", async (req, res) => {
+  try {
+    console.log('[REFRESH] Starting helper.js to get new streams...');
+    runHelperOnce();
+    res.json({ message: "Stream refresh started", status: "ok" });
+  } catch (error) {
+    console.error('[REFRESH] Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ---------- API: HLS Proxy ----------
 app.get("/api/hls", async (req, res) => {
   try {
@@ -212,12 +224,6 @@ app.get("/api/hls", async (req, res) => {
     if (!target || typeof target !== "string") {
       console.log('[HLS] Missing u param');
       return res.status(400).send("Missing u param");
-    }
-
-    // Sadece .m3u8 ve .ts dosyalarına izin ver
-    if (!target.includes('.m3u8') && !target.includes('.ts')) {
-      console.log('[HLS] Blocked non-stream file:', target);
-      return res.status(404).send('Not found');
     }
 
     const referer = getReferer();
@@ -235,7 +241,8 @@ app.get("/api/hls", async (req, res) => {
     if (!r.ok) {
       const txt = await r.text().catch(() => "");
       console.error('[HLS] Upstream error:', r.status, r.statusText, 'URL:', target);
-      return res.status(r.status).send(txt || "Upstream error");
+      console.error('[HLS] Stream may be invalid. Try refreshing streams.');
+      return res.status(r.status).send(txt || "Stream not available");
     }
 
     const ct = r.headers.get("content-type") || "";
@@ -246,39 +253,31 @@ app.get("/api/hls", async (req, res) => {
 
     if (isPlaylist) {
       const text = await r.text();
+      console.log('[HLS] Processing playlist, length:', text.length);
+      
+      // M3U8 içindeki URL'leri proxy'le
       const base = new URL(target);
       const baseUrl = base.origin + base.pathname.substring(0, base.pathname.lastIndexOf("/") + 1);
-      const lines = text.split("\n");
-      const rewritten = [];
       
-      for (const line of lines) {
-        const l = line.trim();
+      const processedPlaylist = text.split("\n").map(line => {
+        const trimmed = line.trim();
         
-        // Boş satırlar ve yorumları koru
-        if (!l || l.startsWith("#")) {
-          rewritten.push(line);
-          continue;
+        // Yorum satırları ve boş satırları koru
+        if (!trimmed || trimmed.startsWith("#")) {
+          return line;
         }
         
-        // .jpeg, .jpg, .png dosyalarını atla
-        if (l.includes('.jpeg') || l.includes('.jpg') || l.includes('.png')) {
-          console.log('[HLS] Skipping image segment:', l);
-          continue;
+        // Segment URL'lerini proxy'le
+        try {
+          const segmentUrl = new URL(trimmed, baseUrl).href;
+          return `/api/hls?u=${encodeURIComponent(segmentUrl)}`;
+        } catch {
+          return line; // Geçersiz URL'leri olduğu gibi bırak
         }
-        
-        // Sadece .ts ve .m3u8 dosyalarını işle
-        if (l.includes('.ts') || l.includes('.m3u8')) {
-          const abs = new URL(l, baseUrl).href;
-          rewritten.push(`/api/hls?u=${encodeURIComponent(abs)}`);
-        } else {
-          console.log('[HLS] Skipping unknown segment:', l);
-        }
-      }
+      }).join("\n");
       
-      const finalPlaylist = rewritten.join("\n");
-
       res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
-      return res.send(finalPlaylist);
+      return res.send(processedPlaylist);
     } else {
       if (ct) res.setHeader("Content-Type", ct);
       return r.body.pipe(res);

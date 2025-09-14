@@ -144,6 +144,22 @@ export default function App() {
     }
   };
 
+const refreshStreams = async () => {
+  try {
+    console.log('[CLIENT] Refreshing streams...');
+    const res = await fetch(`${API}/api/refresh-streams`, { 
+      method: 'POST',
+      cache: "no-store" 
+    });
+    const data = await res.json();
+    console.log('[CLIENT] Stream refresh result:', data);
+    return data;
+  } catch (error) {
+    console.error('[CLIENT] Stream refresh error:', error);
+    return null;
+  }
+};
+
 const testStream = async (channelName) => {
   try {
     console.log('[CLIENT] Testing stream for:', channelName);
@@ -286,10 +302,18 @@ const playChannel = async (channelName) => {
         .thin-scroll { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.15) transparent; }
       `}</style>
 
-      {/* HEADER — sade, sadece logo (büyük) */}
+      {/* HEADER — logo + refresh butonu */}
       <header className="fixed inset-x-0 top-0 z-40 border-b border-white/10 bg-black/60 backdrop-blur">
-        <div className="mx-auto max-w-7xl px-4 py-4 md:py-5 flex items-center justify-center">
+        <div className="mx-auto max-w-7xl px-4 py-4 md:py-5 flex items-center justify-between">
+          <div></div>
           <img src="/logom.png" alt="logo" className="h-12 md:h-16 w-auto" />
+          <button
+            onClick={refreshStreams}
+            className="px-3 py-2 text-sm bg-white/10 hover:bg-white/20 rounded-lg border border-white/20 transition-colors"
+            title="Yayın kaynaklarını yenile"
+          >
+            🔄 Yenile
+          </button>
         </div>
       </header>
 

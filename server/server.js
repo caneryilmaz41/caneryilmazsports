@@ -117,9 +117,9 @@ app.get("/api/stream/:channel", noCache, (req, res) => {
     return res.status(404).send("Channel not found");
   }
 
-  const proxied = `/api/hls?u=${encodeURIComponent(url)}`;
-  console.log('[STREAM] Returning proxied URL:', proxied);
-  res.json({ channel, url: proxied });
+  // Production'da direkt URL kullan
+  console.log('[STREAM] Returning direct URL:', url);
+  res.json({ channel, url: url });
 });
 
 // ---------- API: id → stream ----------
@@ -155,14 +155,21 @@ function channelNameFromId(id) {
 
 app.get("/api/stream-id/:id", noCache, (req, res) => {
   const id = decodeURIComponent(req.params.id || "");
+  
+  // Eğer ID zaten bir URL ise direkt kullan
+  if (id.startsWith('http')) {
+    const proxied = `/api/hls?u=${encodeURIComponent(id)}`;
+    return res.json({ id, name: 'Direct Stream', url: proxied });
+  }
+  
   const name = channelNameFromId(id);
   if (!name) return res.status(404).send("Unknown id");
   const streams = loadStreams();
   const url = streams[name];
   if (!url) return res.status(404).send("Channel stream not found");
 
-  const proxied = `/api/hls?u=${encodeURIComponent(url)}`;
-  res.json({ id, name, url: proxied });
+  // Production'da direkt URL kullan
+  res.json({ id, name, url: url });
 });
 
 // ---------- API: Test Stream URL ----------
@@ -221,38 +228,39 @@ app.get("/api/hls", async (req, res) => {
   try {
     const target = req.query.u;
     console.log('[HLS] Request for:', target);
-    if (!target || typeof target !== "string") {
-      return res.status(400).send("Missing u param");
+    if (!target) {
+      console.log('[HLS] No target URL');
+      return res.status(400).send("Missing URL");
     }
 
+    console.log('[HLS] Fetching:', target);
     const referer = getReferer();
     const r = await fetch(target, {
       headers: {
         Referer: referer,
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        Accept: "*/*",
-        "Accept-Language": "tr-TR,tr;q=0.9",
       },
     });
 
+    console.log('[HLS] Response status:', r.status);
     if (!r.ok) {
-      console.error('[HLS] Error:', r.status, target);
-      return res.status(r.status).send("Not found");
+      console.error('[HLS] Fetch failed:', r.status, r.statusText);
+      return res.status(r.status).send("Fetch failed");
     }
 
-    // CORS headers
+    const text = await r.text();
+    console.log('[HLS] Response length:', text.length);
+    console.log('[HLS] First 200 chars:', text.substring(0, 200));
+
     res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
     res.setHeader("Cache-Control", "no-cache");
     
-    // Content type'ı koru
-    const ct = r.headers.get("content-type");
-    if (ct) res.setHeader("Content-Type", ct);
-
-    // Stream'i direkt pipe et
-    return r.body.pipe(res);
+    console.log('[HLS] Sending response');
+    res.send(text);
   } catch (err) {
-    console.error("HLS proxy error:", err);
-    res.status(500).send("Error");
+    console.error('[HLS] Error:', err.message);
+    res.status(500).send("Proxy error");
   }
 });
 

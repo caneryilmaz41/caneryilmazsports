@@ -248,25 +248,37 @@ app.get("/api/hls", async (req, res) => {
       const text = await r.text();
       const base = new URL(target);
       const baseUrl = base.origin + base.pathname.substring(0, base.pathname.lastIndexOf("/") + 1);
-      const rewritten = text.split("\n").map(line => {
+      const lines = text.split("\n");
+      const rewritten = [];
+      
+      for (const line of lines) {
         const l = line.trim();
-        if (!l || l.startsWith("#")) return line;
-        // .jpeg, .jpg, .png gibi dosyaları tamamen kaldır
+        
+        // Boş satırlar ve yorumları koru
+        if (!l || l.startsWith("#")) {
+          rewritten.push(line);
+          continue;
+        }
+        
+        // .jpeg, .jpg, .png dosyalarını atla
         if (l.includes('.jpeg') || l.includes('.jpg') || l.includes('.png')) {
-          console.log('[HLS] Removing non-stream segment:', l);
-          return ''; // Boş satır döndür
+          console.log('[HLS] Skipping image segment:', l);
+          continue;
         }
-        // Sadece .ts ve .m3u8 dosyalarını proxy'le
-        if (!l.includes('.ts') && !l.includes('.m3u8')) {
+        
+        // Sadece .ts ve .m3u8 dosyalarını işle
+        if (l.includes('.ts') || l.includes('.m3u8')) {
+          const abs = new URL(l, baseUrl).href;
+          rewritten.push(`/api/hls?u=${encodeURIComponent(abs)}`);
+        } else {
           console.log('[HLS] Skipping unknown segment:', l);
-          return '';
         }
-        const abs = new URL(l, baseUrl).href;
-        return `/api/hls?u=${encodeURIComponent(abs)}`;
-      }).filter(line => line !== '').join("\n");
+      }
+      
+      const finalPlaylist = rewritten.join("\n");
 
       res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
-      return res.send(rewritten);
+      return res.send(finalPlaylist);
     } else {
       if (ct) res.setHeader("Content-Type", ct);
       return r.body.pipe(res);

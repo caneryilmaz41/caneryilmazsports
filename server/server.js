@@ -251,14 +251,19 @@ app.get("/api/hls", async (req, res) => {
       const rewritten = text.split("\n").map(line => {
         const l = line.trim();
         if (!l || l.startsWith("#")) return line;
+        // .jpeg, .jpg, .png gibi dosyaları tamamen kaldır
+        if (l.includes('.jpeg') || l.includes('.jpg') || l.includes('.png')) {
+          console.log('[HLS] Removing non-stream segment:', l);
+          return ''; // Boş satır döndür
+        }
         // Sadece .ts ve .m3u8 dosyalarını proxy'le
         if (!l.includes('.ts') && !l.includes('.m3u8')) {
-          console.log('[HLS] Skipping non-stream segment:', l);
-          return line; // Orijinal satırı döndür, proxy'leme
+          console.log('[HLS] Skipping unknown segment:', l);
+          return '';
         }
         const abs = new URL(l, baseUrl).href;
         return `/api/hls?u=${encodeURIComponent(abs)}`;
-      }).join("\n");
+      }).filter(line => line !== '').join("\n");
 
       res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
       return res.send(rewritten);

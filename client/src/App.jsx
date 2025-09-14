@@ -1,7 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Hls from "hls.js";
-// API kökü: Vercel'de env'den, localde localhost
-const API = import.meta.env.VITE_API_BASE || "http://localhost:5001";
+// API kökü: Production'da env'den, localde localhost
+const API = import.meta.env.VITE_API_BASE || 
+  (import.meta.env.MODE === 'production' 
+    ? 'https://caneryilmazsports-backend.onrender.com' 
+    : 'http://localhost:5001');
+
+console.log('API URL:', API);
+console.log('Mode:', import.meta.env.MODE);
+console.log('VITE_API_BASE:', import.meta.env.VITE_API_BASE);
 
 const getServerUrl = () => {
   const url = import.meta.env.VITE_SERVER_URL || "http://localhost:5001";
@@ -76,10 +83,15 @@ export default function App() {
 
   const commonPlay = async (playUrl, label = "") => {
     try {
+      console.log('[PLAYER] Starting playback for:', label, 'URL:', playUrl);
       const video = videoRef.current;
-      if (!video) return;
+      if (!video) {
+        console.error('[PLAYER] Video element not found');
+        return;
+      }
 
       if (hlsRef.current) {
+        console.log('[PLAYER] Destroying existing HLS instance');
         hlsRef.current.destroy();
         hlsRef.current = null;
       }
@@ -88,32 +100,72 @@ export default function App() {
       setIsPlaying(false);
 
       if (Hls.isSupported()) {
+        console.log('[PLAYER] HLS is supported, creating new instance');
         const hls = new Hls({ enableWorker: true });
         hlsRef.current = hls;
+        
+        hls.on(Hls.Events.ERROR, (event, data) => {
+          console.error('[HLS] Error:', event, data);
+        });
+        
+        hls.on(Hls.Events.MANIFEST_LOADING, () => {
+          console.log('[HLS] Manifest loading...');
+        });
+        
+        hls.on(Hls.Events.MANIFEST_LOADED, () => {
+          console.log('[HLS] Manifest loaded');
+        });
+        
         hls.loadSource(playUrl);
         hls.attachMedia(video);
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          console.log('[HLS] Manifest parsed, starting playback');
           video.play().then(() => {
+            console.log('[HLS] Playback started successfully');
             setIsPlaying(true);
-          }).catch(() => {});
+          }).catch((err) => {
+            console.error('[HLS] Playback failed:', err);
+          });
         });
       } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+        console.log('[PLAYER] Using native HLS support');
         video.src = playUrl;
         await video.play().then(() => {
+          console.log('[PLAYER] Native playback started');
           setIsPlaying(true);
-        }).catch(() => {});
+        }).catch((err) => {
+          console.error('[PLAYER] Native playback failed:', err);
+        });
+      } else {
+        console.error('[PLAYER] HLS not supported');
       }
     } catch (e) {
-      console.error("play error:", e);
+      console.error('[PLAYER] Play error:', e);
     }
   };
 
 const playChannel = async (channelName) => {
-  const res = await fetch(`${API}/api/stream/${encodeURIComponent(channelName)}?t=${Date.now()}`, { cache: "no-store" });
-  const data = await res.json();
-  if (!data?.url) return;
-  const fullUrl = data.url.startsWith('/') ? `${API}${data.url}` : data.url;
-  commonPlay(fullUrl, channelName);
+  try {
+    console.log('[CLIENT] Requesting channel:', channelName);
+    console.log('[CLIENT] API URL:', `${API}/api/stream/${encodeURIComponent(channelName)}?t=${Date.now()}`);
+    const res = await fetch(`${API}/api/stream/${encodeURIComponent(channelName)}?t=${Date.now()}`, { cache: "no-store" });
+    console.log('[CLIENT] Response status:', res.status);
+    if (!res.ok) {
+      console.error('[CLIENT] Response not ok:', res.status, res.statusText);
+      return;
+    }
+    const data = await res.json();
+    console.log('[CLIENT] Response data:', data);
+    if (!data?.url) {
+      console.error('[CLIENT] No URL in response');
+      return;
+    }
+    const fullUrl = data.url.startsWith('/') ? `${API}${data.url}` : data.url;
+    console.log('[CLIENT] Full URL:', fullUrl);
+    commonPlay(fullUrl, channelName);
+  } catch (error) {
+    console.error('[CLIENT] Error in playChannel:', error);
+  }
 };
 
 

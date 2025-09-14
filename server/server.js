@@ -21,7 +21,7 @@ const app = express();
 app.set("etag", false);
 // ---------- CORS ----------
 app.use(cors({
-  origin: ['https://caneryilmazsports.vercel.app', 'http://localhost:5173', 'http://localhost:3000'],
+  origin: ['https://caneryilmazsports.vercel.app', 'http://localhost:5173', 'http://localhost:3000', 'https://caneryilmazsports-backend.onrender.com'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -108,11 +108,17 @@ app.get("/api/matches", (req, res) => {
 // ---------- API: Kanal ismine göre stream ----------
 app.get("/api/stream/:channel", noCache, (req, res) => {
   const channel = decodeURIComponent(req.params.channel || "");
+  console.log('[STREAM] Request for channel:', channel);
   const streams = loadStreams();
+  console.log('[STREAM] Available streams:', Object.keys(streams));
   const url = streams[channel];
-  if (!url) return res.status(404).send("Channel not found");
+  if (!url) {
+    console.log('[STREAM] Channel not found:', channel);
+    return res.status(404).send("Channel not found");
+  }
 
   const proxied = `/api/hls?u=${encodeURIComponent(url)}`;
+  console.log('[STREAM] Returning proxied URL:', proxied);
   res.json({ channel, url: proxied });
 });
 
@@ -163,7 +169,9 @@ app.get("/api/stream-id/:id", noCache, (req, res) => {
 app.get("/api/hls", async (req, res) => {
   try {
     const target = req.query.u;
+    console.log('[HLS] Request for:', target);
     if (!target || typeof target !== "string") {
+      console.log('[HLS] Missing u param');
       return res.status(400).send("Missing u param");
     }
 

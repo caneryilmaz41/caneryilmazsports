@@ -222,7 +222,6 @@ app.get("/api/hls", async (req, res) => {
     const target = req.query.u;
     console.log('[HLS] Request for:', target);
     if (!target || typeof target !== "string") {
-      console.log('[HLS] Missing u param');
       return res.status(400).send("Missing u param");
     }
 
@@ -230,61 +229,30 @@ app.get("/api/hls", async (req, res) => {
     const r = await fetch(target, {
       headers: {
         Referer: referer,
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         Accept: "*/*",
         "Accept-Language": "tr-TR,tr;q=0.9",
-        "Cache-Control": "no-cache",
-        "Pragma": "no-cache"
       },
     });
 
     if (!r.ok) {
-      const txt = await r.text().catch(() => "");
-      console.error('[HLS] Upstream error:', r.status, r.statusText, 'URL:', target);
-      console.error('[HLS] Stream may be invalid. Try refreshing streams.');
-      return res.status(r.status).send(txt || "Stream not available");
+      console.error('[HLS] Error:', r.status, target);
+      return res.status(r.status).send("Not found");
     }
 
-    const ct = r.headers.get("content-type") || "";
-    const isPlaylist = ct.includes("mpegurl") || target.includes(".m3u8");
-
+    // CORS headers
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Cache-Control", "no-cache");
+    
+    // Content type'ı koru
+    const ct = r.headers.get("content-type");
+    if (ct) res.setHeader("Content-Type", ct);
 
-    if (isPlaylist) {
-      const text = await r.text();
-      console.log('[HLS] Processing playlist, length:', text.length);
-      
-      // M3U8 içindeki URL'leri proxy'le
-      const base = new URL(target);
-      const baseUrl = base.origin + base.pathname.substring(0, base.pathname.lastIndexOf("/") + 1);
-      
-      const processedPlaylist = text.split("\n").map(line => {
-        const trimmed = line.trim();
-        
-        // Yorum satırları ve boş satırları koru
-        if (!trimmed || trimmed.startsWith("#")) {
-          return line;
-        }
-        
-        // Segment URL'lerini proxy'le
-        try {
-          const segmentUrl = new URL(trimmed, baseUrl).href;
-          return `/api/hls?u=${encodeURIComponent(segmentUrl)}`;
-        } catch {
-          return line; // Geçersiz URL'leri olduğu gibi bırak
-        }
-      }).join("\n");
-      
-      res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
-      return res.send(processedPlaylist);
-    } else {
-      if (ct) res.setHeader("Content-Type", ct);
-      return r.body.pipe(res);
-    }
+    // Stream'i direkt pipe et
+    return r.body.pipe(res);
   } catch (err) {
-    console.error("hls proxy error:", err);
-    res.status(500).send("hls proxy error");
+    console.error("HLS proxy error:", err);
+    res.status(500).send("Error");
   }
 });
 

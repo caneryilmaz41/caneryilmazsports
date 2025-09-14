@@ -1,235 +1,187 @@
 [
   {
-    "title": "Eyüpspor - Galatasaray",
-    "time": "17:00",
+    "title": "Fenerbahçe - Trabzonspor",
+    "time": "19:00",
     "id": "yayin1",
     "href": "/channel.html?id=yayin1"
   },
   {
-    "title": "Beşiktaş - Rams Başakşehir",
-    "time": "20:00",
-    "id": "yayin1",
-    "href": "/channel.html?id=yayin1"
+    "title": "Türkiye vs Almanya",
+    "time": "21:00",
+    "id": "yayintrt1",
+    "href": "/channel.html?id=yayintrt1"
   },
   {
-    "title": "Konyaspor - Alanyaspor",
-    "time": "20:00",
-    "id": "yayinb2",
-    "href": "/channel.html?id=yayinb2"
-  },
-  {
-    "title": "Samsunspor - Antalyaspor",
-    "time": "17:00",
-    "id": "yayinb2",
-    "href": "/channel.html?id=yayinb2"
-  },
-  {
-    "title": "Fatih Karagümrük - Kasımpaşa",
-    "time": "17:00",
+    "title": "Gaziantep FK - Kocaelispor",
+    "time": "19:00",
     "id": "yayinb3",
     "href": "/channel.html?id=yayinb3"
   },
   {
-    "title": "Sırbistan - Türkiye",
-    "time": "13:00",
+    "title": "Amedspor - Pendikspor",
+    "time": "19:00",
+    "id": "yayintrtspor",
+    "href": "/channel.html?id=yayintrtspor"
+  },
+  {
+    "title": "Kayserispor - Göztepe",
+    "time": "17:00",
+    "id": "yayinb2",
+    "href": "/channel.html?id=yayinb2"
+  },
+  {
+    "title": "Roma - Torino",
+    "time": "13:30",
     "id": "yayinss2",
     "href": "/channel.html?id=yayinss2"
   },
   {
-    "title": "Darmstadt 98 - Braunschweig",
-    "time": "14:00",
-    "id": "yayint3",
-    "href": "/channel.html?id=yayint3"
+    "title": "Elversberg - Dynamo Dresden",
+    "time": "14:30",
+    "id": "yayinss",
+    "href": "/channel.html?id=yayinss"
   },
   {
-    "title": "Karlsruhe - Nürnberg",
-    "time": "14:00",
-    "id": "yayint1",
-    "href": "/channel.html?id=yayint1"
-  },
-  {
-    "title": "Schalke 04 - Holstein Kiel",
-    "time": "14:00",
+    "title": "Greuther Fürth - Kaiserslautern",
+    "time": "14:30",
     "id": "yayint2",
     "href": "/channel.html?id=yayint2"
   },
   {
-    "title": "Arsenal - Nottingham Forest",
-    "time": "14:30",
-    "id": "yayinb3",
-    "href": "/channel.html?id=yayinb3"
-  },
-  {
-    "title": "Getafe - Real Oviedo",
+    "title": "Celta Vigo - Girona",
     "time": "15:00",
     "id": "yayinss",
     "href": "/channel.html?id=yayinss"
   },
   {
-    "title": "Annecy - Reims",
-    "time": "15:00",
-    "id": "yayinb4",
-    "href": "/channel.html?id=yayinb4"
-  },
-  {
-    "title": "Cagliari - Parma",
+    "title": "Atalanta - Lecce",
     "time": "16:00",
     "id": "yayinss2",
     "href": "/channel.html?id=yayinss2"
   },
   {
-    "title": "İstanbulspor - Ümraniyespor",
+    "title": "Pisa - Udinese",
+    "time": "16:00",
+    "id": "yayint4",
+    "href": "/channel.html?id=yayint4"
+  },
+  {
+    "title": "Burnley - Liverpool",
+    "time": "16:00",
+    "id": "yayinb3",
+    "href": "/channel.html?id=yayinb3"
+  },
+  {
+    "title": "Lille - Toulouse",
+    "time": "16:00",
+    "id": "yayinb4",
+    "href": "/channel.html?id=yayinb4"
+  },
+  {
+    "title": "Iğdırspor - Serik Bld.",
+    "time": "16:00",
+    "id": "yayintrtspor",
+    "href": "/channel.html?id=yayintrtspor"
+  },
+  {
+    "title": "Bandırmaspor - Keçiörengücü",
     "time": "16:00",
     "id": "yayinbm1",
     "href": "/channel.html?id=yayinbm1"
   },
   {
-    "title": "Boluspor - Manisa FK",
-    "time": "16:00",
-    "id": "yayintrtspor",
-    "href": "/channel.html?id=yayintrtspor"
-  },
-  {
-    "title": "Freiburg - Stuttgart",
-    "time": "16:30",
-    "id": "yayint3",
-    "href": "/channel.html?id=yayint3"
-  },
-  {
-    "title": "Heidenheim - B.Dortmund",
+    "title": "St.Pauli - Augsburg",
     "time": "16:30",
     "id": "yayint2",
     "href": "/channel.html?id=yayint2"
   },
   {
-    "title": "Mainz - Leipzig",
-    "time": "16:30",
-    "id": "yayint4",
-    "href": "/channel.html?id=yayint4"
+    "title": "Kilmarnock - Celtic",
+    "time": "17:00",
+    "id": "yayinss",
+    "href": "/channel.html?id=yayinss"
   },
   {
-    "title": "Everton - Aston Villa",
-    "time": "17:00",
-    "id": "yayinb4",
-    "href": "/channel.html?id=yayinb4"
+    "title": "Levante - Real Betis",
+    "time": "17:15",
+    "id": "yayinss",
+    "href": "/channel.html?id=yayinss"
   },
   {
-    "title": "Newcastle - Wolverhampton",
-    "time": "17:00",
+    "title": "PSG - Lens",
+    "time": "18:15",
     "id": "yayinb5",
     "href": "/channel.html?id=yayinb5"
   },
   {
-    "title": "Real Sociedad - Real Madrid",
-    "time": "17:15",
-    "id": "yayinex1",
-    "href": "/channel.html?id=yayinex1"
+    "title": "Strasbourg - Le Havre",
+    "time": "18:15",
+    "id": "yayinbm2",
+    "href": "/channel.html?id=yayinbm2"
   },
   {
-    "title": "Ajax - Zwolle",
-    "time": "17:30",
-    "id": "yayint1",
-    "href": "/channel.html?id=yayint1"
+    "title": "Monchengladbach - Werder Bremen",
+    "time": "18:30",
+    "id": "yayint3",
+    "href": "/channel.html?id=yayint3"
   },
   {
-    "title": "Juventus - Inter",
+    "title": "Manchester City - Manchester Utd",
+    "time": "18:30",
+    "id": "yayinb4",
+    "href": "/channel.html?id=yayinb4"
+  },
+  {
+    "title": "Sassuolo - Lazio",
     "time": "19:00",
     "id": "yayinss2",
     "href": "/channel.html?id=yayinss2"
   },
   {
-    "title": "Sivasspor - Sarıyer",
-    "time": "19:00",
-    "id": "yayinbm2",
-    "href": "/channel.html?id=yayinbm2"
-  },
-  {
-    "title": "Çorum FK - Vanspor",
-    "time": "19:00",
-    "id": "yayintrtspor",
-    "href": "/channel.html?id=yayintrtspor"
-  },
-  {
-    "title": "Athletic Bilbao - Alaves",
+    "title": "Osasuna - Rayo Vallecano",
     "time": "19:30",
     "id": "yayinss",
     "href": "/channel.html?id=yayinss"
   },
   {
-    "title": "Bayern Münih - Hamburg",
-    "time": "19:30",
-    "id": "yayint2",
-    "href": "/channel.html?id=yayint2"
-  },
-  {
-    "title": "West Ham - Tottenham",
-    "time": "19:30",
-    "id": "yayinb3",
-    "href": "/channel.html?id=yayinb3"
-  },
-  {
-    "title": "NEC Nijmegen - PSV",
-    "time": "19:45",
-    "id": "yayint3",
-    "href": "/channel.html?id=yayint3"
-  },
-  {
-    "title": "Porto - Nacional",
+    "title": "Detroit Lions - Chicago Bears",
     "time": "20:00",
     "id": "yayinss",
     "href": "/channel.html?id=yayinss"
   },
   {
-    "title": "ABD - Çekya",
+    "title": "Al Nassr - Al Kholood",
     "time": "21:00",
     "id": "yayinss",
     "href": "/channel.html?id=yayinss"
   },
   {
-    "title": "Hannover 96 - Hertha Berlin",
-    "time": "21:30",
-    "id": "yayint2",
-    "href": "/channel.html?id=yayint2"
-  },
-  {
-    "title": "Fiorentina - Napoli",
+    "title": "Milan - Bologna",
     "time": "21:45",
     "id": "yayinss2",
     "href": "/channel.html?id=yayinss2"
   },
   {
-    "title": "Nimes - Tremblay",
+    "title": "Rennes - Lyon",
     "time": "21:45",
-    "id": "yayinb5",
-    "href": "/channel.html?id=yayinb5"
+    "id": "yayinb4",
+    "href": "/channel.html?id=yayinb4"
   },
   {
-    "title": "Atletico Madrid - Villarreal",
+    "title": "Barcelona - Valencia",
     "time": "22:00",
     "id": "yayinss",
     "href": "/channel.html?id=yayinss"
   },
   {
-    "title": "Brentford - Chelsea",
+    "title": "Juventude - Flamengo",
     "time": "22:00",
-    "id": "yayinb3",
-    "href": "/channel.html?id=yayinb3"
+    "id": "yayinsms2",
+    "href": "/channel.html?id=yayinsms2"
   },
   {
-    "title": "Feyenoord - Heerenveen",
-    "time": "22:00",
-    "id": "yayint3",
-    "href": "/channel.html?id=yayint3"
-  },
-  {
-    "title": "Auxerre - Monaco",
-    "time": "22:05",
-    "id": "yayinb4",
-    "href": "/channel.html?id=yayinb4"
-  },
-  {
-    "title": "Famalicao - Sporting Lisbon",
-    "time": "22:30",
+    "title": "Kansas Chiefs - Philadelphia Eagles",
+    "time": "23:25",
     "id": "yayinss",
     "href": "/channel.html?id=yayinss"
   }

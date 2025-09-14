@@ -1,188 +1,450 @@
 [
   {
-    "title": "Fenerbahçe - Trabzonspor",
-    "time": "19:00",
     "id": "yayin1",
-    "href": "/channel.html?id=yayin1"
+    "title": "Fenerbahçe - Trabzonspor\n            19:00"
   },
   {
-    "title": "Türkiye vs Almanya",
-    "time": "21:00",
     "id": "yayintrt1",
-    "href": "/channel.html?id=yayintrt1"
+    "title": "Türkiye vs Almanya\n                    21:00"
   },
   {
-    "title": "Gaziantep FK - Kocaelispor",
-    "time": "19:00",
     "id": "yayinb3",
-    "href": "/channel.html?id=yayinb3"
+    "title": "Gaziantep FK - Kocaelispor\n            19:00"
   },
   {
-    "title": "Amedspor - Pendikspor",
-    "time": "19:00",
     "id": "yayintrtspor",
-    "href": "/channel.html?id=yayintrtspor"
+    "title": "Amedspor - Pendikspor\n                    19:00"
   },
   {
-    "title": "Kayserispor - Göztepe",
-    "time": "17:00",
     "id": "yayinb2",
-    "href": "/channel.html?id=yayinb2"
+    "title": "Kayserispor - Göztepe\n                            17:00"
   },
   {
-    "title": "Roma - Torino",
-    "time": "13:30",
     "id": "yayinss2",
-    "href": "/channel.html?id=yayinss2"
+    "title": "Roma - Torino\n            13:30CANLI"
   },
   {
-    "title": "Elversberg - Dynamo Dresden",
-    "time": "14:30",
     "id": "yayinss",
-    "href": "/channel.html?id=yayinss"
+    "title": "Elversberg - Dynamo Dresden\n            14:30CANLI"
   },
   {
-    "title": "Greuther Fürth - Kaiserslautern",
-    "time": "14:30",
     "id": "yayint2",
-    "href": "/channel.html?id=yayint2"
+    "title": "Greuther Fürth - Kaiserslautern\n            14:30CANLI"
   },
   {
-    "title": "Celta Vigo - Girona",
-    "time": "15:00",
     "id": "yayinss",
-    "href": "/channel.html?id=yayinss"
+    "title": "Celta Vigo - Girona\n            15:00"
   },
   {
-    "title": "Atalanta - Lecce",
-    "time": "16:00",
     "id": "yayinss2",
-    "href": "/channel.html?id=yayinss2"
+    "title": "Atalanta - Lecce\n            16:00"
   },
   {
-    "title": "Pisa - Udinese",
-    "time": "16:00",
     "id": "yayint4",
-    "href": "/channel.html?id=yayint4"
+    "title": "Pisa - Udinese\n            16:00"
   },
   {
-    "title": "Burnley - Liverpool",
-    "time": "16:00",
     "id": "yayinb3",
-    "href": "/channel.html?id=yayinb3"
+    "title": "Burnley - Liverpool\n            16:00"
   },
   {
-    "title": "Lille - Toulouse",
-    "time": "16:00",
     "id": "yayinb4",
-    "href": "/channel.html?id=yayinb4"
+    "title": "Lille - Toulouse\n            16:00"
   },
   {
-    "title": "Iğdırspor - Serik Bld.",
-    "time": "16:00",
     "id": "yayintrtspor",
-    "href": "/channel.html?id=yayintrtspor"
+    "title": "Iğdırspor - Serik Bld.\n            16:00"
   },
   {
-    "title": "Bandırmaspor - Keçiörengücü",
-    "time": "16:00",
     "id": "yayinbm1",
-    "href": "/channel.html?id=yayinbm1"
+    "title": "Bandırmaspor - Keçiörengücü\n            16:00"
   },
   {
-    "title": "St.Pauli - Augsburg",
-    "time": "16:30",
     "id": "yayint2",
-    "href": "/channel.html?id=yayint2"
+    "title": "St.Pauli - Augsburg\n            16:30"
   },
   {
-    "title": "Kilmarnock - Celtic",
-    "time": "17:00",
     "id": "yayinss",
-    "href": "/channel.html?id=yayinss"
+    "title": "Kilmarnock - Celtic\n            17:00"
   },
   {
-    "title": "Levante - Real Betis",
-    "time": "17:15",
     "id": "yayinss",
-    "href": "/channel.html?id=yayinss"
+    "title": "Levante - Real Betis\n            17:15"
   },
   {
-    "title": "PSG - Lens",
-    "time": "18:15",
     "id": "yayinb5",
-    "href": "/channel.html?id=yayinb5"
+    "title": "PSG - Lens\n            18:15"
   },
   {
-    "title": "Strasbourg - Le Havre",
-    "time": "18:15",
     "id": "yayinbm2",
-    "href": "/channel.html?id=yayinbm2"
+    "title": "Strasbourg - Le Havre\n            18:15"
   },
   {
-    "title": "Monchengladbach - Werder Bremen",
-    "time": "18:30",
     "id": "yayint3",
-    "href": "/channel.html?id=yayint3"
+    "title": "Monchengladbach - Werder Bremen\n            18:30"
   },
   {
-    "title": "Manchester City - Manchester Utd",
-    "time": "18:30",
     "id": "yayinb4",
-    "href": "/channel.html?id=yayinb4"
+    "title": "Manchester City - Manchester Utd\n            18:30"
   },
   {
-    "title": "Sassuolo - Lazio",
-    "time": "19:00",
     "id": "yayinss2",
-    "href": "/channel.html?id=yayinss2"
+    "title": "Sassuolo - Lazio\n            19:00"
   },
   {
-    "title": "Osasuna - Rayo Vallecano",
-    "time": "19:30",
     "id": "yayinss",
-    "href": "/channel.html?id=yayinss"
+    "title": "Osasuna - Rayo Vallecano\n            19:30"
   },
   {
-    "title": "Detroit Lions - Chicago Bears",
-    "time": "20:00",
     "id": "yayinss",
-    "href": "/channel.html?id=yayinss"
+    "title": "Detroit Lions - Chicago Bears\n            20:00"
   },
   {
-    "title": "Al Nassr - Al Kholood",
-    "time": "21:00",
     "id": "yayinss",
-    "href": "/channel.html?id=yayinss"
+    "title": "Al Nassr - Al Kholood\n            21:00"
   },
   {
-    "title": "Milan - Bologna",
-    "time": "21:45",
     "id": "yayinss2",
-    "href": "/channel.html?id=yayinss2"
+    "title": "Milan - Bologna\n            21:45"
   },
   {
-    "title": "Rennes - Lyon",
-    "time": "21:45",
     "id": "yayinb4",
-    "href": "/channel.html?id=yayinb4"
+    "title": "Rennes - Lyon\n            21:45"
   },
   {
-    "title": "Barcelona - Valencia",
-    "time": "22:00",
     "id": "yayinss",
-    "href": "/channel.html?id=yayinss"
+    "title": "Barcelona - Valencia\n            22:00"
   },
   {
-    "title": "Juventude - Flamengo",
-    "time": "22:00",
     "id": "yayinsms2",
-    "href": "/channel.html?id=yayinsms2"
+    "title": "Juventude - Flamengo\n            22:00"
   },
   {
-    "title": "Kansas Chiefs - Philadelphia Eagles",
-    "time": "23:25",
     "id": "yayinss",
-    "href": "/channel.html?id=yayinss"
+    "title": "Kansas Chiefs - Philadelphia Eagles\n            23:25"
+  },
+  {
+    "id": "yayin1",
+    "title": "BeIN Sports 1\n                                7/24CANLI"
+  },
+  {
+    "id": "yayinb2",
+    "title": "BeIN Sports 2\n                                7/24CANLI"
+  },
+  {
+    "id": "yayinb3",
+    "title": "BeIN Sports 3\n                                7/24CANLI"
+  },
+  {
+    "id": "yayinb4",
+    "title": "BeIN Sports 4\n                                7/24CANLI"
+  },
+  {
+    "id": "yayinb5",
+    "title": "BeIN Sports 5\n                                7/24CANLI"
+  },
+  {
+    "id": "yayinbm1",
+    "title": "BeIN Max 1\n                                7/24CANLI"
+  },
+  {
+    "id": "yayinbm2",
+    "title": "BeIN Max 2\n                                7/24CANLI"
+  },
+  {
+    "id": "yayinss",
+    "title": "S Sport\n                                7/24CANLI"
+  },
+  {
+    "id": "yayinss2",
+    "title": "S Sport 2\n                                7/24CANLI"
+  },
+  {
+    "id": "yayint1",
+    "title": "Tivibu 1\n                                7/24CANLI"
+  },
+  {
+    "id": "yayint2",
+    "title": "Tivibu 2\n                                7/24CANLI"
+  },
+  {
+    "id": "yayint3",
+    "title": "Tivibu 3\n                                7/24CANLI"
+  },
+  {
+    "id": "yayint4",
+    "title": "Tivibu 4\n                                7/24CANLI"
+  },
+  {
+    "id": "yayinsmarts",
+    "title": "Smartspor\n                                7/24CANLI"
+  },
+  {
+    "id": "yayinsms2",
+    "title": "Smartspor 2\n                                7/24CANLI"
+  },
+  {
+    "id": "yayintrtspor",
+    "title": "TRT Spor\n                                7/24CANLI"
+  },
+  {
+    "id": "yayintrtspor2",
+    "title": "TRT Spor 2\n                                7/24CANLI"
+  },
+  {
+    "id": "yayintrt1",
+    "title": "TRT 1\n                                7/24CANLI"
+  },
+  {
+    "id": "yayinas",
+    "title": "A Spor\n                                7/24CANLI"
+  },
+  {
+    "id": "yayinatv",
+    "title": "ATV\n                                7/24CANLI"
+  },
+  {
+    "id": "yayintv8",
+    "title": "TV 8\n                                7/24CANLI"
+  },
+  {
+    "id": "yayintv85",
+    "title": "TV 8,5\n                                7/24CANLI"
+  },
+  {
+    "id": "yayinnbatv",
+    "title": "NBA TV\n                                7/24CANLI"
+  },
+  {
+    "id": "yayineu1",
+    "title": "Euro Sport 1\n                                7/24CANLI"
+  },
+  {
+    "id": "yayineu2",
+    "title": "Euro Sport 2\n                                7/24CANLI"
+  },
+  {
+    "id": "yayin1",
+    "title": "Fenerbahçe - Trabzonspor\n            19:00"
+  },
+  {
+    "id": "yayintrt1",
+    "title": "Türkiye vs Almanya\n                    21:00"
+  },
+  {
+    "id": "yayinb3",
+    "title": "Gaziantep FK - Kocaelispor\n            19:00"
+  },
+  {
+    "id": "yayintrtspor",
+    "title": "Amedspor - Pendikspor\n                    19:00"
+  },
+  {
+    "id": "yayinb2",
+    "title": "Kayserispor - Göztepe\n                            17:00"
+  },
+  {
+    "id": "yayinss2",
+    "title": "Roma - Torino\n            13:30CANLI"
+  },
+  {
+    "id": "yayinss",
+    "title": "Elversberg - Dynamo Dresden\n            14:30CANLI"
+  },
+  {
+    "id": "yayint2",
+    "title": "Greuther Fürth - Kaiserslautern\n            14:30CANLI"
+  },
+  {
+    "id": "yayinss",
+    "title": "Celta Vigo - Girona\n            15:00"
+  },
+  {
+    "id": "yayinss2",
+    "title": "Atalanta - Lecce\n            16:00"
+  },
+  {
+    "id": "yayint4",
+    "title": "Pisa - Udinese\n            16:00"
+  },
+  {
+    "id": "yayinb3",
+    "title": "Burnley - Liverpool\n            16:00"
+  },
+  {
+    "id": "yayinb4",
+    "title": "Lille - Toulouse\n            16:00"
+  },
+  {
+    "id": "yayintrtspor",
+    "title": "Iğdırspor - Serik Bld.\n            16:00"
+  },
+  {
+    "id": "yayinbm1",
+    "title": "Bandırmaspor - Keçiörengücü\n            16:00"
+  },
+  {
+    "id": "yayint2",
+    "title": "St.Pauli - Augsburg\n            16:30"
+  },
+  {
+    "id": "yayinss",
+    "title": "Kilmarnock - Celtic\n            17:00"
+  },
+  {
+    "id": "yayinss",
+    "title": "Levante - Real Betis\n            17:15"
+  },
+  {
+    "id": "yayinb5",
+    "title": "PSG - Lens\n            18:15"
+  },
+  {
+    "id": "yayinbm2",
+    "title": "Strasbourg - Le Havre\n            18:15"
+  },
+  {
+    "id": "yayint3",
+    "title": "Monchengladbach - Werder Bremen\n            18:30"
+  },
+  {
+    "id": "yayinb4",
+    "title": "Manchester City - Manchester Utd\n            18:30"
+  },
+  {
+    "id": "yayinss2",
+    "title": "Sassuolo - Lazio\n            19:00"
+  },
+  {
+    "id": "yayinss",
+    "title": "Osasuna - Rayo Vallecano\n            19:30"
+  },
+  {
+    "id": "yayinss",
+    "title": "Detroit Lions - Chicago Bears\n            20:00"
+  },
+  {
+    "id": "yayinss",
+    "title": "Al Nassr - Al Kholood\n            21:00"
+  },
+  {
+    "id": "yayinss2",
+    "title": "Milan - Bologna\n            21:45"
+  },
+  {
+    "id": "yayinb4",
+    "title": "Rennes - Lyon\n            21:45"
+  },
+  {
+    "id": "yayinss",
+    "title": "Barcelona - Valencia\n            22:00"
+  },
+  {
+    "id": "yayinsms2",
+    "title": "Juventude - Flamengo\n            22:00"
+  },
+  {
+    "id": "yayinss",
+    "title": "Kansas Chiefs - Philadelphia Eagles\n            23:25"
+  },
+  {
+    "id": "yayin1",
+    "title": "BeIN Sports 1\n                                7/24CANLI"
+  },
+  {
+    "id": "yayinb2",
+    "title": "BeIN Sports 2\n                                7/24CANLI"
+  },
+  {
+    "id": "yayinb3",
+    "title": "BeIN Sports 3\n                                7/24CANLI"
+  },
+  {
+    "id": "yayinb4",
+    "title": "BeIN Sports 4\n                                7/24CANLI"
+  },
+  {
+    "id": "yayinb5",
+    "title": "BeIN Sports 5\n                                7/24CANLI"
+  },
+  {
+    "id": "yayinbm1",
+    "title": "BeIN Max 1\n                                7/24CANLI"
+  },
+  {
+    "id": "yayinbm2",
+    "title": "BeIN Max 2\n                                7/24CANLI"
+  },
+  {
+    "id": "yayinss",
+    "title": "S Sport\n                                7/24CANLI"
+  },
+  {
+    "id": "yayinss2",
+    "title": "S Sport 2\n                                7/24CANLI"
+  },
+  {
+    "id": "yayint1",
+    "title": "Tivibu 1\n                                7/24CANLI"
+  },
+  {
+    "id": "yayint2",
+    "title": "Tivibu 2\n                                7/24CANLI"
+  },
+  {
+    "id": "yayint3",
+    "title": "Tivibu 3\n                                7/24CANLI"
+  },
+  {
+    "id": "yayint4",
+    "title": "Tivibu 4\n                                7/24CANLI"
+  },
+  {
+    "id": "yayinsmarts",
+    "title": "Smartspor\n                                7/24CANLI"
+  },
+  {
+    "id": "yayinsms2",
+    "title": "Smartspor 2\n                                7/24CANLI"
+  },
+  {
+    "id": "yayintrtspor",
+    "title": "TRT Spor\n                                7/24CANLI"
+  },
+  {
+    "id": "yayintrtspor2",
+    "title": "TRT Spor 2\n                                7/24CANLI"
+  },
+  {
+    "id": "yayintrt1",
+    "title": "TRT 1\n                                7/24CANLI"
+  },
+  {
+    "id": "yayinas",
+    "title": "A Spor\n                                7/24CANLI"
+  },
+  {
+    "id": "yayinatv",
+    "title": "ATV\n                                7/24CANLI"
+  },
+  {
+    "id": "yayintv8",
+    "title": "TV 8\n                                7/24CANLI"
+  },
+  {
+    "id": "yayintv85",
+    "title": "TV 8,5\n                                7/24CANLI"
+  },
+  {
+    "id": "yayinnbatv",
+    "title": "NBA TV\n                                7/24CANLI"
+  },
+  {
+    "id": "yayineu1",
+    "title": "Euro Sport 1\n                                7/24CANLI"
+  },
+  {
+    "id": "yayineu2",
+    "title": "Euro Sport 2\n                                7/24CANLI"
   }
 ]

@@ -1,5 +1,13 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Hls from "hls.js";
+// API kökü: Vercel'de env'den, localde localhost
+const API = import.meta.env.VITE_API_BASE || "http://localhost:5001";
+
+const getServerUrl = () => {
+  const url = import.meta.env.VITE_SERVER_URL || "http://localhost:5001";
+  console.log('Server URL:', url);
+  return url;
+};
 
 /* Hafif, bağımsız ikonlar (kütüphane yok, inline SVG) */
 const IconBall = (props) => (
@@ -47,86 +55,76 @@ export default function App() {
   const [matchQuery, setMatchQuery] = useState("");
   const [channelQuery, setChannelQuery] = useState("");
 
+  
+
   useEffect(() => {
-    fetch("http://localhost:5001/api/channels")
+    fetch(`${API}/api/channels?t=${Date.now()}`, { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => setChannels(Array.isArray(data) ? data : Object.keys(data || {})))
       .catch(() => setChannels(["BeIN Sports 1", "BeIN Sports 2", "BeIN Sports 3", "BeIN Sports 4"]));
   }, []);
 
   useEffect(() => {
-    fetch("http://localhost:5001/api/matches")
+     fetch(`${API}/api/matches?t=${Date.now()}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => setMatches(Array.isArray(d) ? d : []))
       .catch(() => setMatches([]));
   }, []);
 
-  const safeResetVideo = (video) => {
-    try { video.pause(); } catch {}
-    try { video.removeAttribute("src"); video.load(); } catch {}
-  };
+  const videoRef = useRef(null);
+  const hlsRef = useRef(null);
 
-  const commonPlay = (streamUrl, labelForUI = null) => {
-    const video = document.getElementById("video");
+  const commonPlay = async (playUrl, label = "") => {
+    try {
+      const video = videoRef.current;
+      if (!video) return;
 
-    if (hlsInstance) {
-      try { hlsInstance.stopLoad(); hlsInstance.detachMedia(); hlsInstance.destroy(); } catch {}
-      setHlsInstance(null);
-    }
-    safeResetVideo(video);
-    setIsPlaying(false);
-
-    if (Hls.isSupported()) {
-      const hls = new Hls({
-        xhrSetup: (xhr, url) => {
-          xhr.open("GET", `http://localhost:5001/api/proxy?url=${encodeURIComponent(url)}`);
-        },
-      });
-      hls.loadSource(streamUrl);
-      hls.attachMedia(video);
-      hls.on(Hls.Events.MANIFEST_PARSED, async () => {
-        try { await video.play(); setIsPlaying(true); }
-        catch { try { video.muted = true; await video.play(); setIsPlaying(true); } catch {} }
-      });
-      setHlsInstance(hls);
-    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      video.src = streamUrl;
-      video.addEventListener("loadedmetadata", async () => {
-        try { await video.play(); setIsPlaying(true); } catch {}
-      }, { once: true });
-    }
-
-    if (labelForUI) setActiveChannel(labelForUI);
-    
-    // Video event listeners
-    setTimeout(() => {
-      const video = document.getElementById('video');
-      if (video) {
-        video.addEventListener('play', () => {
-          setVideoPaused(false);
-          showControlsTemporarily();
-        });
-        video.addEventListener('pause', () => {
-          setVideoPaused(true);
-          setShowControls(true); // Durdurulduğunda kontrolleri göster
-        });
-        video.addEventListener('volumechange', () => {
-          setVideoMuted(video.muted);
-        });
-
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
       }
-    }, 100);
+
+      setActiveChannel(label);
+      setIsPlaying(false);
+
+      if (Hls.isSupported()) {
+        const hls = new Hls({ enableWorker: true });
+        hlsRef.current = hls;
+        hls.loadSource(playUrl);
+        hls.attachMedia(video);
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          video.play().then(() => {
+            setIsPlaying(true);
+          }).catch(() => {});
+        });
+      } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+        video.src = playUrl;
+        await video.play().then(() => {
+          setIsPlaying(true);
+        }).catch(() => {});
+      }
+    } catch (e) {
+      console.error("play error:", e);
+    }
   };
 
-  const playChannel = (channelName) => {
-    const streamUrl = `http://localhost:5001/api/stream/${encodeURIComponent(channelName)}`;
-    commonPlay(streamUrl, channelName);
-  };
+const playChannel = async (channelName) => {
+  const res = await fetch(`${API}/api/stream/${encodeURIComponent(channelName)}?t=${Date.now()}`, { cache: "no-store" });
+  const data = await res.json();
+  if (!data?.url) return;
+  const fullUrl = data.url.startsWith('/') ? `${API}${data.url}` : data.url;
+  commonPlay(fullUrl, channelName);
+};
 
-  const playByMatchId = (id, fallbackTitle = null) => {
-    const streamUrl = `http://localhost:5001/api/stream-id/${encodeURIComponent(id)}`;
-    commonPlay(streamUrl, fallbackTitle || id);
-  };
+
+  const playByMatchId = async (id, fallbackTitle = null) => {
+  const res = await fetch(`${API}/api/stream-id/${encodeURIComponent(id)}?t=${Date.now()}`, { cache: "no-store" });
+  const data = await res.json();
+  if (!data?.url) return;
+  const fullUrl = data.url.startsWith('/') ? `${API}${data.url}` : data.url;
+  commonPlay(fullUrl, fallbackTitle || id);
+};
+
 
   // Kontrol gösterme/gizleme
   const showControlsTemporarily = () => {
@@ -254,9 +252,17 @@ export default function App() {
             <div style={{ paddingTop: "56.25%" }} />
 
             <video
+              ref={videoRef}
               id="video"
               className="absolute inset-0 h-full w-full z-10"
               poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1920 1080'%3E%3Crect width='1920' height='1080' fill='%23000000'/%3E%3C/svg%3E"
+              onPlay={() => { setVideoPaused(false); setIsPlaying(true); }}
+              onPause={() => { setVideoPaused(true); setIsPlaying(false); }}
+              onVolumeChange={(e) => setVideoMuted(e.target.muted)}
+              onLoadStart={() => setIsPlaying(false)}
+              onCanPlay={() => setIsPlaying(true)}
+              onError={() => setIsPlaying(false)}
+              onPlaying={() => setIsPlaying(true)}
             />
 
             {/* Permanent Logo at Bottom Center */}
@@ -598,9 +604,9 @@ export default function App() {
       {/* FOOTER */}
       <footer className="mx-auto max-w-7xl px-4 pb-6 pt-2 md:pt-0">
         <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-center text-xs text-white/60">
-          © {new Date().getFullYear()} — caneryilmazsports-hd
+          © {new Date().getFullYear()} — Yayın arayüzü • hafif ve hızlı.
         </div>
-      </footer>x  
+      </footer>
     </div>
   );
 }

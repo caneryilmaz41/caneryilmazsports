@@ -196,9 +196,9 @@ const playChannel = async (channelName) => {
       console.error('[CLIENT] No URL in response');
       return;
     }
-    const fullUrl = data.url.startsWith('/') ? `${API}${data.url}` : data.url;
-    console.log('[CLIENT] Full URL:', fullUrl);
-    commonPlay(fullUrl, channelName);
+    // Direkt URL kullan
+    console.log('[CLIENT] Using direct URL:', data.url);
+    commonPlay(data.url, channelName);
   } catch (error) {
     console.error('[CLIENT] Error in playChannel:', error);
   }

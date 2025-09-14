@@ -234,11 +234,16 @@ app.get("/api/hls", async (req, res) => {
     }
 
     console.log('[HLS] Fetching:', target);
-    const referer = getReferer();
+    const targetUrl = new URL(target);
+    const referer = `${targetUrl.protocol}//${targetUrl.host}/`;
+    console.log('[HLS] Using referer:', referer);
+    
     const r = await fetch(target, {
       headers: {
         Referer: referer,
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept": "*/*",
+        "Accept-Language": "tr-TR,tr;q=0.9",
       },
     });
 

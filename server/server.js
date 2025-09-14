@@ -86,7 +86,7 @@ function loadMatches() {
 function getReferer() {
   try {
     const raw = JSON.parse(fs.readFileSync(path.join(__dirname, "domain.json"), "utf8"));
-    return raw.domain || raw.active || "https://trgoals1394.xyz/";
+    return raw.domain || "https://trgoals1394.xyz/";
   } catch {
     return "https://trgoals1394.xyz/";
   }
